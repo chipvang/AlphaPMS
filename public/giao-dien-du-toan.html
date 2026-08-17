@@ -1,0 +1,1471 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>giao-dien-du-toan.html</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;max-width:736px;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe id="codex-visualization" sandbox="allow-scripts" scrolling="no" referrerpolicy="no-referrer" title="giao-dien-du-toan.html" data-srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en-US&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'&quot;&gt;
+&lt;title&gt;giao-dien-du-toan.html&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;script&gt;(() =&gt; {
+  const root = document.documentElement;
+  const mediaQuery = globalThis.matchMedia(&quot;(prefers-color-scheme: dark)&quot;);
+  const apply = Reflect.apply;
+  const isArray = Array.isArray;
+  const parentWindow = globalThis.parent;
+  /**
+   * @param {object} prototype
+   * @param {string} property
+   */
+  const getPrototypeGetter = (prototype, property) =&gt; {
+    // oxlint-disable-next-line typescript/unbound-method -- invoked through captured Reflect.apply
+    const getter = Object.getOwnPropertyDescriptor(prototype, property)?.get;
+    if (getter == null) {
+      throw new Error(`Missing ${property} getter`);
+    }
+    return getter;
+  };
+  const getMessageData = getPrototypeGetter(MessageEvent.prototype, &quot;data&quot;);
+  const getMessagePorts = getPrototypeGetter(MessageEvent.prototype, &quot;ports&quot;);
+  const getMessageSource = getPrototypeGetter(MessageEvent.prototype, &quot;source&quot;);
+  // oxlint-disable-next-line typescript/unbound-method -- captured before the untrusted fragment runs
+  const addHostMessageListener = MessagePort.prototype.addEventListener;
+  // oxlint-disable-next-line typescript/unbound-method -- captured before the untrusted fragment runs
+  const postHostMessage = MessagePort.prototype.postMessage;
+  // oxlint-disable-next-line typescript/unbound-method -- captured before the untrusted fragment runs
+  const startHostPort = MessagePort.prototype.start;
+  // oxlint-disable-next-line typescript/unbound-method -- captured before the untrusted fragment runs
+  const stopMessagePropagation = Event.prototype.stopImmediatePropagation;
+  /** @type {MessagePort | null} */
+  let hostPort = null;
+  const postToHost = (type, payload) =&gt; {
+    if (hostPort != null) {
+      apply(postHostMessage, hostPort, [{ type, ...payload }]);
+    }
+  };
+  const openExternal = ({ href }) =&gt; {
+    if (globalThis.navigator.userActivation?.isActive === true) {
+      postToHost(&quot;open-external&quot;, { href });
+    }
+  };
+  const sendFollowUpMessage = ({ context, prompt, title }) =&gt; {
+    if (globalThis.navigator.userActivation?.isActive === true) {
+      postToHost(&quot;follow-up&quot;, { context, prompt, title });
+    }
+    return Promise.resolve();
+  };
+  const syncTheme = () =&gt; {
+    const theme = mediaQuery.matches ? &quot;dark&quot; : &quot;light&quot;;
+    root.dataset.theme = theme;
+    globalThis.openai = {
+      ...globalThis.openai,
+      openExternal,
+      sendFollowUpMessage,
+      theme,
+      visualizationStyleVariables: {},
+      visualizationTheme: theme,
+    };
+    globalThis.dispatchEvent(
+      new CustomEvent(&quot;openai:set_globals&quot;, {
+        detail: { globals: globalThis.openai },
+      }),
+    );
+  };
+  const sendHeight = () =&gt; {
+    postToHost(&quot;height&quot;, {
+      height: Math.ceil(
+        Math.max(
+          document.body.scrollHeight,
+          document.body.getBoundingClientRect().height,
+        ),
+      ),
+    });
+  };
+
+  globalThis.addEventListener(
+    &quot;message&quot;,
+    (event) =&gt; {
+      const data = apply(getMessageData, event, []);
+      const ports = apply(getMessagePorts, event, []);
+      const source = apply(getMessageSource, event, []);
+      if (
+        source !== parentWindow ||
+        typeof data !== &quot;object&quot; ||
+        data == null ||
+        data.type !== &quot;codex-visualization-initialize&quot; ||
+        !isArray(ports) ||
+        ports.length !== 1
+      ) {
+        return;
+      }
+      apply(stopMessagePropagation, event, []);
+      const nextHostPort = ports[0];
+      try {
+        apply(addHostMessageListener, nextHostPort, [
+          &quot;message&quot;,
+          (event) =&gt; {
+            const data = apply(getMessageData, event, []);
+            if (typeof data === &quot;object&quot; &amp;&amp; data?.type === &quot;measure&quot;) {
+              sendHeight();
+            }
+          },
+        ]);
+        apply(startHostPort, nextHostPort, []);
+      } catch {
+        return;
+      }
+      hostPort = nextHostPort;
+      sendHeight();
+    },
+    { capture: true },
+  );
+  document.currentScript?.remove();
+  mediaQuery.addEventListener(&quot;change&quot;, syncTheme);
+  globalThis.addEventListener(&quot;click&quot;, (event) =&gt; {
+    if (event.defaultPrevented) {
+      return;
+    }
+    let element = null;
+    if (event.target instanceof globalThis.Element) {
+      element = event.target;
+    } else if (event.target instanceof globalThis.Node) {
+      element = event.target.parentElement;
+    }
+    const link = element?.closest(&quot;a[href]&quot;);
+    const href = link?.getAttribute(&quot;href&quot;);
+    if (href == null) {
+      return;
+    }
+    if (href.startsWith(&quot;#&quot;)) {
+      let id;
+      try {
+        id = decodeURIComponent(href.slice(1));
+      } catch {
+        return;
+      }
+      const target = id.length === 0 ? root : document.getElementById(id);
+      if (
+        target == null ||
+        globalThis.navigator.userActivation?.isActive !== true
+      ) {
+        return;
+      }
+      event.preventDefault();
+      postToHost(&quot;scroll-to&quot;, {
+        top: target.getBoundingClientRect().top + globalThis.scrollY,
+      });
+      return;
+    }
+    event.preventDefault();
+    openExternal({ href });
+  });
+  new ResizeObserver(sendHeight).observe(document.body);
+  syncTheme();
+})();
+&lt;/script&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(
+    --background,
+    var(--color-background-primary, light-dark(rgb(255 255 255), rgb(24 24 24)))
+  ) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: var(
+    --color-background-primary,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --popover: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255), rgb(45 45 45))
+  );
+  --popover-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --primary: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --primary-foreground: var(
+    --color-text-inverse,
+    light-dark(rgb(255 255 255), rgb(13 13 13))
+  );
+  --secondary: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+  );
+  --secondary-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: var(
+    --color-text-secondary,
+    light-dark(rgb(26 28 31 / 49.4%), rgb(255 255 255 / 49.8%))
+  );
+  --accent: var(
+    --color-background-info,
+    light-dark(rgb(229 242 255), rgb(13 39 63))
+  );
+  --accent-foreground: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --destructive: var(
+    --color-text-warning,
+    light-dark(rgb(226 85 7), rgb(255 133 73))
+  );
+  --border: var(
+    --color-border-secondary,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+  --input: var(
+    --color-border-primary,
+    light-dark(
+      rgb(26 28 31 / 11.8%),
+      color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+    )
+  );
+  --ring: var(
+    --color-ring-primary,
+    light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
+  );
+  --font-size-base: var(--font-text-md-size, 14px);
+  --blue: light-dark(rgb(51 156 255), rgb(51 156 255));
+  --orange: light-dark(rgb(226 85 7), rgb(251 106 34));
+  --green: light-dark(rgb(0 162 64), rgb(64 201 119));
+  --red: light-dark(rgb(224 46 42), rgb(255 103 100));
+  --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
+  --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --radius: var(--border-radius-lg, 12.5px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 17'%3E%3Cpath d='M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z'/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  /* Preserve MCP aliases for older inline renderers without creating :root cycles. */
+  --color-background-primary: var(
+    --background,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --color-text-primary: var(
+    --foreground,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --color-border-secondary: var(
+    --border,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+
+  margin: 0;
+  padding: 5px;
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: superellipse(1.5);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: superellipse(1.5);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: superellipse(1.5);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: superellipse(1.5);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+    [aria-pressed=&quot;true&quot;],
+    [aria-selected=&quot;true&quot;],
+    .is-selected
+  ) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+/* Model-authored chart rules can otherwise stretch icons after these styles load. */
+svg.lucide {
+  display: block;
+  width: 16px !important;
+  height: 16px !important;
+  flex: none;
+  margin: 0 !important;
+  stroke-width: 1.6;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;script&gt;
+(() =&gt; {
+  const root = document.documentElement;
+  const initialGlobals =
+    globalThis.__codexVisualizationInitialGlobals ?? globalThis.openai;
+  delete globalThis.__codexVisualizationInitialGlobals;
+  let appliedProperties = [];
+
+  const applyHostStyleVariables = (styleVariables) =&gt; {
+    if (styleVariables == null || typeof styleVariables !== &quot;object&quot;) {
+      return;
+    }
+    for (const property of appliedProperties) {
+      root.style.removeProperty(property);
+    }
+    appliedProperties = [];
+    for (const [property, value] of Object.entries(styleVariables)) {
+      if (property.startsWith(&quot;--&quot;) &amp;&amp; typeof value === &quot;string&quot;) {
+        root.style.setProperty(property, value);
+        appliedProperties.push(property);
+      }
+    }
+  };
+
+  const syncHostStyles = (globals) =&gt; {
+    applyHostStyleVariables(globals?.visualizationStyleVariables);
+  };
+
+  syncHostStyles(initialGlobals);
+  globalThis.addEventListener(&quot;openai:set_globals&quot;, (event) =&gt; {
+    syncHostStyles(event.detail?.globals);
+  });
+})();
+&lt;/script&gt;
+
+&lt;style&gt;
+#ap-est{--e-bg:light-dark(#f1f4f7,#11171c);--e-panel:light-dark(#fff,#192229);--e-panel2:light-dark(#f7f9fb,#212b32);--e-border:light-dark(#d9e1e7,#34434d);--e-text:light-dark(#111,#f1f3f4);--e-muted:light-dark(#5f6c75,#aeb8be);--e-primary:light-dark(#087786,#55c7d2);--e-soft:light-dark(#e4f3f5,#173b41);--e-warn:light-dark(#bc7612,#efb45c);font-family:Inter,&quot;Segoe UI&quot;,Arial,sans-serif;color:var(--e-text);font-size:11px;background:transparent}#ap-est *{box-sizing:border-box}#ap-est button,#ap-est select,#ap-est input{font:inherit;color:inherit}.e-app{display:grid;grid-template-columns:210px minmax(0,1fr);background:var(--e-panel);border:1px solid var(--e-border);border-radius:12px;overflow:hidden;box-shadow:0 12px 36px light-dark(#1d34451c,#0007)}
+.e-side{background:var(--e-panel2);border-right:1px solid var(--e-border);padding:12px;display:flex;flex-direction:column;gap:12px}.e-brand{display:flex;align-items:center;gap:8px;font-weight:500;padding:2px 3px 10px;border-bottom:1px solid var(--e-border)}.e-logo{width:28px;height:28px;border-radius:7px;background:var(--e-primary);color:light-dark(#fff,#071114);display:grid;place-items:center}.e-projects{border:1px solid var(--e-border);border-radius:8px;background:var(--e-panel);padding:9px}.e-projects header{display:flex;justify-content:space-between;margin-bottom:7px}.e-projects small{display:block;color:var(--e-muted)}.e-check{display:flex;gap:7px;align-items:center;padding:6px 2px}.e-check input{accent-color:var(--e-primary)}.e-nav{display:grid;gap:3px}.e-nav button{border:0;background:transparent;color:var(--e-muted);border-radius:6px;padding:8px;display:flex;align-items:center;gap:8px;text-align:left}.e-nav button.active{background:var(--e-soft);color:var(--e-primary);font-weight:500}.e-user{margin-top:auto;border-top:1px solid var(--e-border);padding-top:10px;display:flex;align-items:center;gap:8px}.e-avatar{width:27px;height:27px;border-radius:50%;background:var(--e-primary);color:light-dark(#fff,#071114);display:grid;place-items:center}.e-user small{display:block;color:var(--e-muted)}
+.e-main{min-width:0}.e-top{height:50px;padding:0 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--e-border)}.e-top h2{font-size:14px;font-weight:500;margin:0}.e-grow{flex:1}.e-btn{height:30px;border:1px solid var(--e-border);border-radius:6px;background:var(--e-panel);padding:0 9px;display:inline-flex;align-items:center;gap:6px;cursor:pointer}.e-btn.primary{background:var(--e-primary);border-color:var(--e-primary);color:light-dark(#fff,#071114)}.e-toolbar{padding:8px 10px;background:var(--e-panel2);border-bottom:1px solid var(--e-border);display:flex;gap:6px;align-items:center;flex-wrap:wrap}.e-status{color:var(--e-muted)}
+.e-upper{height:405px;overflow:auto;border-bottom:3px solid var(--e-border)}.e-table{border-collapse:collapse;min-width:1960px;width:100%;table-layout:fixed}.e-table th,.e-table td{border-right:1px solid var(--e-border);border-bottom:1px solid var(--e-border);padding:4px 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.e-table thead th{background:var(--e-panel2);color:var(--e-text);font-weight:500;text-align:center}.e-table thead tr:first-child th{height:26px}.e-table thead tr:last-child th{height:26px}.e-table tbody tr{height:28px;cursor:pointer;color:var(--e-text)}.e-table tbody tr:hover,.e-table tbody tr.selected{background:var(--e-soft)}.e-table tbody tr.project{background:light-dark(#eef6f7,#183036);font-weight:500}.e-table tbody tr.item{background:var(--e-panel2);font-weight:500}.e-table tbody tr.group{font-weight:500}.e-table .num{text-align:right;font-variant-numeric:tabular-nums}.e-name{display:flex;align-items:center;gap:5px;color:var(--e-text)}.e-i1{padding-left:20px}.e-i2{padding-left:36px}.e-i3{padding-left:52px}.e-i4{padding-left:68px}.e-actions{display:flex;gap:1px;justify-content:center}.e-ico{width:18px;height:18px;border:0;background:transparent;color:var(--e-muted);display:grid;place-items:center;padding:0;cursor:pointer}.e-ico:hover{color:var(--e-primary);background:var(--e-panel);border-radius:4px}.e-ico svg{width:11px;height:11px}.e-norm{color:var(--e-text)}.e-total{font-weight:500}.e-linked{font-size:10px;color:var(--e-primary);border:1px solid var(--e-primary);border-radius:9px;padding:1px 5px}
+.e-lower{background:var(--e-panel);min-height:300px}.e-tabs{height:39px;display:flex;align-items:flex-end;gap:18px;padding:0 12px;border-bottom:1px solid var(--e-border);background:var(--e-panel2)}.e-tabs button{height:39px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--e-muted);cursor:pointer}.e-tabs button[aria-selected=true]{color:var(--e-primary);border-color:var(--e-primary);font-weight:500}.e-detailbar{padding:7px 10px;display:flex;gap:6px;align-items:center;border-bottom:1px solid var(--e-border)}.e-tabpanel{display:none}.e-tabpanel.active{display:block}.e-detail-wrap{overflow:auto;max-height:245px}.e-detail-table{border-collapse:collapse;width:100%;min-width:920px;table-layout:fixed}.e-detail-table th,.e-detail-table td{border-right:1px solid var(--e-border);border-bottom:1px solid var(--e-border);padding:6px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.e-detail-table th{background:var(--e-panel2);color:var(--e-muted);font-weight:500;text-align:left}.e-detail-table .num{text-align:right}.e-detail-note{padding:11px;color:var(--e-muted)}
+@media(max-width:760px){.e-app{grid-template-columns:52px minmax(0,1fr)}.e-side{padding:8px 6px}.e-brand span,.e-projects,.e-nav span,.e-user div{display:none}.e-brand,.e-user{justify-content:center}.e-nav button{justify-content:center;padding:8px 4px}.e-top h2{font-size:12px}.e-btn span{display:none}}@media(max-width:440px){.e-top .e-btn:not(.primary){display:none}.e-upper{height:360px}.e-tabs{gap:10px;overflow:auto}.e-tabs button{white-space:nowrap}}
+&lt;/style&gt;
+
+&lt;div id=&quot;ap-est&quot;&gt;
+  &lt;div class=&quot;e-app&quot;&gt;
+    &lt;aside class=&quot;e-side&quot;&gt;&lt;div class=&quot;e-brand&quot;&gt;&lt;div class=&quot;e-logo&quot;&gt;A&lt;/div&gt;&lt;span&gt;AlphaPMS&lt;/span&gt;&lt;/div&gt;&lt;section class=&quot;e-projects&quot;&gt;&lt;header&gt;&lt;div&gt;&lt;strong&gt;Dự án hiển thị&lt;/strong&gt;&lt;small&gt;Chọn một hoặc nhiều&lt;/small&gt;&lt;/div&gt;&lt;span style=&quot;color:var(--e-primary)&quot;&gt;2/3&lt;/span&gt;&lt;/header&gt;&lt;label class=&quot;e-check&quot;&gt;&lt;input type=&quot;checkbox&quot; checked&gt;Tuyến thoát nước Bắc An&lt;/label&gt;&lt;label class=&quot;e-check&quot;&gt;&lt;input type=&quot;checkbox&quot; checked&gt;Cầu Sông Xanh&lt;/label&gt;&lt;label class=&quot;e-check&quot;&gt;&lt;input type=&quot;checkbox&quot;&gt;Nhà máy A2&lt;/label&gt;&lt;/section&gt;&lt;nav class=&quot;e-nav&quot;&gt;&lt;button type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;gantt-chart&quot;&gt;&lt;/i&gt;&lt;span&gt;Quản lý tiến độ&lt;/span&gt;&lt;/button&gt;&lt;button class=&quot;active&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;calculator&quot;&gt;&lt;/i&gt;&lt;span&gt;Quản lý dự toán&lt;/span&gt;&lt;/button&gt;&lt;button type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;chart-no-axes-combined&quot;&gt;&lt;/i&gt;&lt;span&gt;Nguồn lực &amp; chi phí&lt;/span&gt;&lt;/button&gt;&lt;button type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;folder-kanban&quot;&gt;&lt;/i&gt;&lt;span&gt;Danh mục dự án&lt;/span&gt;&lt;/button&gt;&lt;button type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;database&quot;&gt;&lt;/i&gt;&lt;span&gt;Danh mục dùng chung&lt;/span&gt;&lt;/button&gt;&lt;button type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;settings&quot;&gt;&lt;/i&gt;&lt;span&gt;Cấu hình&lt;/span&gt;&lt;/button&gt;&lt;/nav&gt;&lt;div class=&quot;e-user&quot;&gt;&lt;div class=&quot;e-avatar&quot;&gt;TP&lt;/div&gt;&lt;div&gt;&lt;strong&gt;Tuấn Phạm&lt;/strong&gt;&lt;small&gt;Chỉ huy trưởng&lt;/small&gt;&lt;/div&gt;&lt;/div&gt;&lt;/aside&gt;
+    &lt;main class=&quot;e-main&quot;&gt;&lt;header class=&quot;e-top&quot;&gt;&lt;h2&gt;Quản lý dự toán nhiều dự án&lt;/h2&gt;&lt;span class=&quot;e-status&quot;&gt;2 dự án · phiên bản DT-03&lt;/span&gt;&lt;span class=&quot;e-grow&quot;&gt;&lt;/span&gt;&lt;button class=&quot;e-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;history&quot;&gt;&lt;/i&gt;&lt;span&gt;Lịch sử&lt;/span&gt;&lt;/button&gt;&lt;button class=&quot;e-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;file-down&quot;&gt;&lt;/i&gt;&lt;span&gt;Xuất Excel&lt;/span&gt;&lt;/button&gt;&lt;button class=&quot;e-btn primary&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;save&quot;&gt;&lt;/i&gt;&lt;span&gt;Lưu thay đổi&lt;/span&gt;&lt;/button&gt;&lt;/header&gt;
+      &lt;div class=&quot;e-toolbar&quot;&gt;&lt;button class=&quot;e-btn primary&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;plus&quot;&gt;&lt;/i&gt;Thêm đầu mục&lt;/button&gt;&lt;button class=&quot;e-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;search&quot;&gt;&lt;/i&gt;Tra định mức&lt;/button&gt;&lt;button class=&quot;e-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;file-spreadsheet&quot;&gt;&lt;/i&gt;Nhập BOQ&lt;/button&gt;&lt;button class=&quot;e-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;link-2&quot;&gt;&lt;/i&gt;Liên kết tiến độ&lt;/button&gt;&lt;button class=&quot;e-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;list-filter&quot;&gt;&lt;/i&gt;Lọc&lt;/button&gt;&lt;span class=&quot;e-grow&quot;&gt;&lt;/span&gt;&lt;span class=&quot;e-status&quot;&gt;Đang chọn: Công tác gộp “Thi công nền đường K95”&lt;/span&gt;&lt;/div&gt;
+      &lt;section class=&quot;e-upper&quot;&gt;&lt;table class=&quot;e-table&quot; aria-label=&quot;Bảng hao phí định mức&quot;&gt;&lt;colgroup&gt;&lt;col style=&quot;width:70px&quot;&gt;&lt;col style=&quot;width:136px&quot;&gt;&lt;col style=&quot;width:94px&quot;&gt;&lt;col style=&quot;width:92px&quot;&gt;&lt;col style=&quot;width:250px&quot;&gt;&lt;col style=&quot;width:65px&quot;&gt;&lt;col style=&quot;width:130px&quot;&gt;&lt;col span=&quot;6&quot; style=&quot;width:68px&quot;&gt;&lt;col style=&quot;width:78px&quot;&gt;&lt;col span=&quot;3&quot; style=&quot;width:86px&quot;&gt;&lt;col span=&quot;3&quot; style=&quot;width:92px&quot;&gt;&lt;/colgroup&gt;&lt;thead&gt;&lt;tr&gt;&lt;th rowspan=&quot;2&quot;&gt;WBS&lt;/th&gt;&lt;th rowspan=&quot;2&quot;&gt;Tác vụ&lt;/th&gt;&lt;th rowspan=&quot;2&quot;&gt;Mã ĐM&lt;/th&gt;&lt;th rowspan=&quot;2&quot;&gt;Mã Alpha&lt;/th&gt;&lt;th rowspan=&quot;2&quot;&gt;Tên công tác&lt;/th&gt;&lt;th rowspan=&quot;2&quot;&gt;Đơn vị&lt;/th&gt;&lt;th colspan=&quot;7&quot;&gt;Khối lượng&lt;/th&gt;&lt;th rowspan=&quot;2&quot;&gt;Khối lượng&lt;/th&gt;&lt;th colspan=&quot;3&quot;&gt;Đơn giá&lt;/th&gt;&lt;th colspan=&quot;3&quot;&gt;Thành tiền&lt;/th&gt;&lt;/tr&gt;&lt;tr&gt;&lt;th&gt;Tên cấu kiện&lt;/th&gt;&lt;th&gt;Số CK&lt;/th&gt;&lt;th&gt;Dài&lt;/th&gt;&lt;th&gt;Rộng&lt;/th&gt;&lt;th&gt;Cao&lt;/th&gt;&lt;th&gt;Hệ số&lt;/th&gt;&lt;th&gt;KL phụ&lt;/th&gt;&lt;th&gt;Vật liệu&lt;/th&gt;&lt;th&gt;Nhân công&lt;/th&gt;&lt;th&gt;Máy TC&lt;/th&gt;&lt;th&gt;Vật liệu&lt;/th&gt;&lt;th&gt;Nhân công&lt;/th&gt;&lt;th&gt;Máy TC&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;
+        &lt;tr class=&quot;project&quot;&gt;&lt;td&gt;A&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;e-name&quot;&gt;&lt;i data-lucide=&quot;chevron-down&quot;&gt;&lt;/i&gt;DỰ ÁN THOÁT NƯỚC BẮC AN&lt;/div&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td colspan=&quot;8&quot;&gt;&lt;/td&gt;&lt;td colspan=&quot;3&quot;&gt;&lt;/td&gt;&lt;td class=&quot;num&quot; colspan=&quot;3&quot;&gt;18.426.580.000&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr class=&quot;item&quot;&gt;&lt;td&gt;A.1&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;e-name e-i1&quot;&gt;&lt;i data-lucide=&quot;chevron-down&quot;&gt;&lt;/i&gt;Hạng mục đường giao thông&lt;/div&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td colspan=&quot;8&quot;&gt;&lt;/td&gt;&lt;td colspan=&quot;3&quot;&gt;&lt;/td&gt;&lt;td class=&quot;num&quot; colspan=&quot;3&quot;&gt;9.780.420.000&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr class=&quot;group&quot;&gt;&lt;td&gt;A.1.1&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;e-name e-i2&quot;&gt;&lt;i data-lucide=&quot;chevron-down&quot;&gt;&lt;/i&gt;Nhóm san lấp nền đường&lt;/div&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td colspan=&quot;8&quot;&gt;&lt;/td&gt;&lt;td colspan=&quot;3&quot;&gt;&lt;/td&gt;&lt;td class=&quot;num&quot; colspan=&quot;3&quot;&gt;2.614.320.000&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr class=&quot;selected e-total&quot; data-est-row&gt;&lt;td&gt;A.1.1.1&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;e-actions&quot;&gt;&lt;button class=&quot;e-ico&quot;&gt;&lt;i data-lucide=&quot;arrow-up&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;button class=&quot;e-ico&quot;&gt;&lt;i data-lucide=&quot;arrow-down&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;button class=&quot;e-ico&quot;&gt;&lt;i data-lucide=&quot;arrow-left&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;button class=&quot;e-ico&quot;&gt;&lt;i data-lucide=&quot;arrow-right&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;button class=&quot;e-ico&quot;&gt;&lt;i data-lucide=&quot;plus&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;button class=&quot;e-ico&quot;&gt;&lt;i data-lucide=&quot;trash-2&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;/div&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;ALP-SL-001&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;e-name e-i3&quot;&gt;&lt;i data-lucide=&quot;chevron-down&quot;&gt;&lt;/i&gt;Thi công nền đường K95 &lt;span class=&quot;e-linked&quot;&gt;gộp 2 ĐM&lt;/span&gt;&lt;/div&gt;&lt;/td&gt;&lt;td&gt;m³&lt;/td&gt;&lt;td&gt;Đoạn K0+000–K0+040&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;12&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;40&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;8&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;0,35&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;1&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;0&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;1.344,00&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;184.200&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;42.500&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;31.800&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;247.564.800&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;57.120.000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;42.739.200&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr class=&quot;e-norm&quot; data-est-row&gt;&lt;td&gt;A.1.1.1.1&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;e-actions&quot;&gt;&lt;button class=&quot;e-ico&quot;&gt;&lt;i data-lucide=&quot;arrow-up&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;button class=&quot;e-ico&quot;&gt;&lt;i data-lucide=&quot;arrow-down&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;button class=&quot;e-ico&quot;&gt;&lt;i data-lucide=&quot;plus&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;button class=&quot;e-ico&quot;&gt;&lt;i data-lucide=&quot;trash-2&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;/div&gt;&lt;/td&gt;&lt;td&gt;AB.13111&lt;/td&gt;&lt;td&gt;ALP-N001&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;e-name e-i4&quot;&gt;Đắp đất nền đường độ chặt K95&lt;/div&gt;&lt;/td&gt;&lt;td&gt;100m³&lt;/td&gt;&lt;td&gt;Nền đường đợt 1&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;12&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;40&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;8&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;0,35&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;1&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;0&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;13,44&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;12.450.000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;3.180.000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;2.240.000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;167.328.000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;42.739.200&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;30.105.600&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr class=&quot;e-norm&quot; data-est-row&gt;&lt;td&gt;A.1.1.1.2&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;e-actions&quot;&gt;&lt;button class=&quot;e-ico&quot;&gt;&lt;i data-lucide=&quot;arrow-up&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;button class=&quot;e-ico&quot;&gt;&lt;i data-lucide=&quot;arrow-down&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;button class=&quot;e-ico&quot;&gt;&lt;i data-lucide=&quot;plus&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;button class=&quot;e-ico&quot;&gt;&lt;i data-lucide=&quot;trash-2&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;/div&gt;&lt;/td&gt;&lt;td&gt;AM.21231&lt;/td&gt;&lt;td&gt;ALP-N002&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;e-name e-i4&quot;&gt;Vận chuyển đất trong phạm vi 10 km&lt;/div&gt;&lt;/td&gt;&lt;td&gt;100m³&lt;/td&gt;&lt;td&gt;Đất đào tận dụng&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;1&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;0&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;13,44&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;5.970.000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;1.070.000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;940.000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;80.236.800&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;14.380.800&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;12.633.600&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr class=&quot;group&quot;&gt;&lt;td&gt;A.1.2&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;e-name e-i2&quot;&gt;&lt;i data-lucide=&quot;chevron-right&quot;&gt;&lt;/i&gt;Nhóm móng mặt đường&lt;/div&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td colspan=&quot;8&quot;&gt;&lt;/td&gt;&lt;td colspan=&quot;3&quot;&gt;&lt;/td&gt;&lt;td class=&quot;num&quot; colspan=&quot;3&quot;&gt;3.845.210.000&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr class=&quot;project&quot;&gt;&lt;td&gt;B&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;e-name&quot;&gt;&lt;i data-lucide=&quot;chevron-right&quot;&gt;&lt;/i&gt;DỰ ÁN CẦU SÔNG XANH&lt;/div&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td colspan=&quot;8&quot;&gt;&lt;/td&gt;&lt;td colspan=&quot;3&quot;&gt;&lt;/td&gt;&lt;td class=&quot;num&quot; colspan=&quot;3&quot;&gt;42.614.900.000&lt;/td&gt;&lt;/tr&gt;
+      &lt;/tbody&gt;&lt;/table&gt;&lt;/section&gt;
+      &lt;section class=&quot;e-lower&quot;&gt;&lt;div class=&quot;e-tabs&quot; role=&quot;tablist&quot;&gt;&lt;button type=&quot;button&quot; data-tab=&quot;material&quot; aria-selected=&quot;true&quot;&gt;Vật liệu&lt;/button&gt;&lt;button type=&quot;button&quot; data-tab=&quot;labor&quot; aria-selected=&quot;false&quot;&gt;Nhân công&lt;/button&gt;&lt;button type=&quot;button&quot; data-tab=&quot;machine&quot; aria-selected=&quot;false&quot;&gt;Máy thi công&lt;/button&gt;&lt;/div&gt;&lt;div class=&quot;e-detailbar&quot;&gt;&lt;button class=&quot;e-btn primary&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;plus&quot;&gt;&lt;/i&gt;Thêm hao phí&lt;/button&gt;&lt;button class=&quot;e-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;arrow-up&quot;&gt;&lt;/i&gt;Lên&lt;/button&gt;&lt;button class=&quot;e-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;arrow-down&quot;&gt;&lt;/i&gt;Xuống&lt;/button&gt;&lt;button class=&quot;e-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;trash-2&quot;&gt;&lt;/i&gt;Xóa&lt;/button&gt;&lt;span class=&quot;e-grow&quot;&gt;&lt;/span&gt;&lt;span class=&quot;e-status&quot;&gt;Hao phí của AB.13111 · Đắp đất nền đường K95&lt;/span&gt;&lt;/div&gt;
+        &lt;div class=&quot;e-tabpanel active&quot; data-panel=&quot;material&quot;&gt;&lt;div class=&quot;e-detail-wrap&quot;&gt;&lt;table class=&quot;e-detail-table&quot;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th style=&quot;width:60px&quot;&gt;ID&lt;/th&gt;&lt;th style=&quot;width:130px&quot;&gt;Tác vụ&lt;/th&gt;&lt;th style=&quot;width:95px&quot;&gt;Mã VL&lt;/th&gt;&lt;th&gt;Tên vật liệu&lt;/th&gt;&lt;th style=&quot;width:80px&quot;&gt;Đơn vị&lt;/th&gt;&lt;th style=&quot;width:100px&quot;&gt;Hao phí&lt;/th&gt;&lt;th style=&quot;width:120px&quot;&gt;Giá&lt;/th&gt;&lt;th style=&quot;width:130px&quot;&gt;Thành tiền&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td class=&quot;num&quot;&gt;1&lt;/td&gt;&lt;td&gt;Lên · Xuống · Thêm · Xóa&lt;/td&gt;&lt;td&gt;VL.1001&lt;/td&gt;&lt;td&gt;Đất đắp đạt yêu cầu&lt;/td&gt;&lt;td&gt;m³&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;122,000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;85.000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;10.370.000&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td class=&quot;num&quot;&gt;2&lt;/td&gt;&lt;td&gt;Lên · Xuống · Thêm · Xóa&lt;/td&gt;&lt;td&gt;VL.1022&lt;/td&gt;&lt;td&gt;Nước phục vụ thi công&lt;/td&gt;&lt;td&gt;m³&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;4,800&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;12.500&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;60.000&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;/div&gt;
+        &lt;div class=&quot;e-tabpanel&quot; data-panel=&quot;labor&quot;&gt;&lt;div class=&quot;e-detail-wrap&quot;&gt;&lt;table class=&quot;e-detail-table&quot;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th style=&quot;width:60px&quot;&gt;ID&lt;/th&gt;&lt;th style=&quot;width:130px&quot;&gt;Tác vụ&lt;/th&gt;&lt;th style=&quot;width:100px&quot;&gt;Mã NC&lt;/th&gt;&lt;th&gt;Tên nhân công&lt;/th&gt;&lt;th style=&quot;width:80px&quot;&gt;Đơn vị&lt;/th&gt;&lt;th style=&quot;width:100px&quot;&gt;Hao phí&lt;/th&gt;&lt;th style=&quot;width:120px&quot;&gt;Giá&lt;/th&gt;&lt;th style=&quot;width:130px&quot;&gt;Thành tiền&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td class=&quot;num&quot;&gt;1&lt;/td&gt;&lt;td&gt;Lên · Xuống · Thêm · Xóa&lt;/td&gt;&lt;td&gt;NC.0035&lt;/td&gt;&lt;td&gt;Nhân công bậc 3,5/7&lt;/td&gt;&lt;td&gt;công&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;0,780&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;347.500&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;271.050&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;/div&gt;
+        &lt;div class=&quot;e-tabpanel&quot; data-panel=&quot;machine&quot;&gt;&lt;div class=&quot;e-detail-wrap&quot;&gt;&lt;table class=&quot;e-detail-table&quot;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th style=&quot;width:60px&quot;&gt;ID&lt;/th&gt;&lt;th style=&quot;width:130px&quot;&gt;Tác vụ&lt;/th&gt;&lt;th style=&quot;width:100px&quot;&gt;Mã máy&lt;/th&gt;&lt;th&gt;Tên máy thi công&lt;/th&gt;&lt;th style=&quot;width:80px&quot;&gt;Đơn vị&lt;/th&gt;&lt;th style=&quot;width:100px&quot;&gt;Hao phí&lt;/th&gt;&lt;th style=&quot;width:120px&quot;&gt;Giá ca máy&lt;/th&gt;&lt;th style=&quot;width:130px&quot;&gt;Thành tiền&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td class=&quot;num&quot;&gt;1&lt;/td&gt;&lt;td&gt;Lên · Xuống · Thêm · Xóa&lt;/td&gt;&lt;td&gt;M.0102&lt;/td&gt;&lt;td&gt;Máy ủi 110 CV&lt;/td&gt;&lt;td&gt;ca&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;0,240&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;3.254.100&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;780.984&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td class=&quot;num&quot;&gt;2&lt;/td&gt;&lt;td&gt;Lên · Xuống · Thêm · Xóa&lt;/td&gt;&lt;td&gt;M.0211&lt;/td&gt;&lt;td&gt;Máy đầm 16 tấn&lt;/td&gt;&lt;td&gt;ca&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;0,320&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;2.845.000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;910.400&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;/div&gt;
+      &lt;/section&gt;
+    &lt;/main&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;script&gt;
+(()=&gt;{const root=document.getElementById('ap-est');const tabs=root.querySelectorAll('[data-tab]');tabs.forEach(tab=&gt;tab.addEventListener('click',()=&gt;{tabs.forEach(t=&gt;t.setAttribute('aria-selected',String(t===tab)));root.querySelectorAll('[data-panel]').forEach(panel=&gt;panel.classList.toggle('active',panel.dataset.panel===tab.dataset.tab));}));root.querySelectorAll('[data-est-row]').forEach(row=&gt;row.addEventListener('click',event=&gt;{if(event.target.closest('button'))return;root.querySelectorAll('[data-est-row]').forEach(r=&gt;r.classList.remove('selected'));row.classList.add('selected');}));})();
+&lt;/script&gt;
+
+
+&lt;style id=&quot;codex-visualization-document-scrollbar&quot;&gt;html,body{scrollbar-width:none!important}html::-webkit-scrollbar,body::-webkit-scrollbar{display:none!important}&lt;/style&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handleLeave = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+<script>(() => {
+  const frame = document.getElementById("codex-visualization");
+  if (!(frame instanceof HTMLIFrameElement)) {
+    return;
+  }
+  let viewportHeight = globalThis.innerHeight;
+
+  const channel = new MessageChannel();
+  channel.port1.addEventListener("message", (event) => {
+    const data = event.data;
+    if (typeof data !== "object" || data == null) {
+      return;
+    }
+    if (data.type === "height") {
+      const height = data.height;
+      if (
+        typeof height === "number" &&
+        Number.isFinite(height) &&
+        height >= 0 &&
+        height <= 10_000
+      ) {
+        frame.style.height = Math.ceil(height) + "px";
+      }
+      return;
+    }
+    if (data.type === "scroll-to") {
+      const top = data.top;
+      if (
+        typeof top === "number" &&
+        Number.isFinite(top) &&
+        top >= 0 &&
+        globalThis.navigator.userActivation?.isActive === true
+      ) {
+        globalThis.scrollTo({
+          top: Math.ceil(
+            globalThis.scrollY + frame.getBoundingClientRect().top + top,
+          ),
+        });
+      }
+      return;
+    }
+    if (data.type === "open-external") {
+      const rawHref = data.href;
+      if (typeof rawHref !== "string") {
+        return;
+      }
+      let href;
+      try {
+        const url = new URL(rawHref, document.baseURI);
+        if (url.protocol !== "https:") {
+          return;
+        }
+        href = url.href;
+      } catch {
+        return;
+      }
+      if (globalThis.navigator.userActivation?.isActive === true) {
+        const anchor = document.createElement("a");
+        anchor.href = href;
+        anchor.rel = "noopener noreferrer";
+        anchor.target = "_blank";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      }
+      return;
+    }
+    if (data.type === "follow-up") {
+      const prompt = data.prompt;
+      if (
+        typeof prompt !== "string" ||
+        globalThis.navigator.userActivation?.isActive !== true
+      ) {
+        return;
+      }
+      const title = data.title;
+      globalThis.prompt(typeof title === "string" ? title : prompt, prompt);
+    }
+  });
+  channel.port1.start();
+  const srcdoc = frame.dataset.srcdoc;
+  if (srcdoc == null) {
+    return;
+  }
+  globalThis.addEventListener("resize", () => {
+    const height = Number.parseFloat(frame.style.height);
+    if (!Number.isFinite(height) || height <= viewportHeight) {
+      frame.style.removeProperty("height");
+    }
+    viewportHeight = globalThis.innerHeight;
+    channel.port1.postMessage({ type: "measure" });
+  });
+  frame.addEventListener(
+    "load",
+    () => {
+      frame.contentWindow?.postMessage(
+        { type: "codex-visualization-initialize" },
+        "*",
+        [channel.port2],
+      );
+    },
+    { once: true },
+  );
+  frame.srcdoc = srcdoc;
+  delete frame.dataset.srcdoc;
+})();
+</script>
+</body>
+</html>

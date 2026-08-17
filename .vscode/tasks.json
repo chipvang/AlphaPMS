@@ -1,0 +1,44 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "AlphaPMS: Cài dependencies",
+      "type": "shell",
+      "command": "pnpm install",
+      "options": {
+        "cwd": "${workspaceFolder:AlphaPMS Code}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "AlphaPMS: Chạy localhost",
+      "type": "shell",
+      "command": "pnpm dev",
+      "options": {
+        "cwd": "${workspaceFolder:AlphaPMS Code}"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "alphapms",
+        "pattern": {
+          "regexp": ".*"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "vinext dev",
+          "endsPattern": "Local:"
+        }
+      }
+    },
+    {
+      "label": "AlphaPMS: Kiểm tra",
+      "type": "shell",
+      "command": "pnpm lint && pnpm build",
+      "options": {
+        "cwd": "${workspaceFolder:AlphaPMS Code}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
+

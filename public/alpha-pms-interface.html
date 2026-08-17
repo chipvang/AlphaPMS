@@ -1,0 +1,1778 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>alpha-pms-interface.html</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;max-width:736px;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe id="codex-visualization" sandbox="allow-scripts" scrolling="no" referrerpolicy="no-referrer" title="alpha-pms-interface.html" data-srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en-US&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'&quot;&gt;
+&lt;title&gt;alpha-pms-interface.html&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;script&gt;(() =&gt; {
+  const root = document.documentElement;
+  const mediaQuery = globalThis.matchMedia(&quot;(prefers-color-scheme: dark)&quot;);
+  const apply = Reflect.apply;
+  const isArray = Array.isArray;
+  const parentWindow = globalThis.parent;
+  /**
+   * @param {object} prototype
+   * @param {string} property
+   */
+  const getPrototypeGetter = (prototype, property) =&gt; {
+    // oxlint-disable-next-line typescript/unbound-method -- invoked through captured Reflect.apply
+    const getter = Object.getOwnPropertyDescriptor(prototype, property)?.get;
+    if (getter == null) {
+      throw new Error(`Missing ${property} getter`);
+    }
+    return getter;
+  };
+  const getMessageData = getPrototypeGetter(MessageEvent.prototype, &quot;data&quot;);
+  const getMessagePorts = getPrototypeGetter(MessageEvent.prototype, &quot;ports&quot;);
+  const getMessageSource = getPrototypeGetter(MessageEvent.prototype, &quot;source&quot;);
+  // oxlint-disable-next-line typescript/unbound-method -- captured before the untrusted fragment runs
+  const addHostMessageListener = MessagePort.prototype.addEventListener;
+  // oxlint-disable-next-line typescript/unbound-method -- captured before the untrusted fragment runs
+  const postHostMessage = MessagePort.prototype.postMessage;
+  // oxlint-disable-next-line typescript/unbound-method -- captured before the untrusted fragment runs
+  const startHostPort = MessagePort.prototype.start;
+  // oxlint-disable-next-line typescript/unbound-method -- captured before the untrusted fragment runs
+  const stopMessagePropagation = Event.prototype.stopImmediatePropagation;
+  /** @type {MessagePort | null} */
+  let hostPort = null;
+  const postToHost = (type, payload) =&gt; {
+    if (hostPort != null) {
+      apply(postHostMessage, hostPort, [{ type, ...payload }]);
+    }
+  };
+  const openExternal = ({ href }) =&gt; {
+    if (globalThis.navigator.userActivation?.isActive === true) {
+      postToHost(&quot;open-external&quot;, { href });
+    }
+  };
+  const sendFollowUpMessage = ({ context, prompt, title }) =&gt; {
+    if (globalThis.navigator.userActivation?.isActive === true) {
+      postToHost(&quot;follow-up&quot;, { context, prompt, title });
+    }
+    return Promise.resolve();
+  };
+  const syncTheme = () =&gt; {
+    const theme = mediaQuery.matches ? &quot;dark&quot; : &quot;light&quot;;
+    root.dataset.theme = theme;
+    globalThis.openai = {
+      ...globalThis.openai,
+      openExternal,
+      sendFollowUpMessage,
+      theme,
+      visualizationStyleVariables: {},
+      visualizationTheme: theme,
+    };
+    globalThis.dispatchEvent(
+      new CustomEvent(&quot;openai:set_globals&quot;, {
+        detail: { globals: globalThis.openai },
+      }),
+    );
+  };
+  const sendHeight = () =&gt; {
+    postToHost(&quot;height&quot;, {
+      height: Math.ceil(
+        Math.max(
+          document.body.scrollHeight,
+          document.body.getBoundingClientRect().height,
+        ),
+      ),
+    });
+  };
+
+  globalThis.addEventListener(
+    &quot;message&quot;,
+    (event) =&gt; {
+      const data = apply(getMessageData, event, []);
+      const ports = apply(getMessagePorts, event, []);
+      const source = apply(getMessageSource, event, []);
+      if (
+        source !== parentWindow ||
+        typeof data !== &quot;object&quot; ||
+        data == null ||
+        data.type !== &quot;codex-visualization-initialize&quot; ||
+        !isArray(ports) ||
+        ports.length !== 1
+      ) {
+        return;
+      }
+      apply(stopMessagePropagation, event, []);
+      const nextHostPort = ports[0];
+      try {
+        apply(addHostMessageListener, nextHostPort, [
+          &quot;message&quot;,
+          (event) =&gt; {
+            const data = apply(getMessageData, event, []);
+            if (typeof data === &quot;object&quot; &amp;&amp; data?.type === &quot;measure&quot;) {
+              sendHeight();
+            }
+          },
+        ]);
+        apply(startHostPort, nextHostPort, []);
+      } catch {
+        return;
+      }
+      hostPort = nextHostPort;
+      sendHeight();
+    },
+    { capture: true },
+  );
+  document.currentScript?.remove();
+  mediaQuery.addEventListener(&quot;change&quot;, syncTheme);
+  globalThis.addEventListener(&quot;click&quot;, (event) =&gt; {
+    if (event.defaultPrevented) {
+      return;
+    }
+    let element = null;
+    if (event.target instanceof globalThis.Element) {
+      element = event.target;
+    } else if (event.target instanceof globalThis.Node) {
+      element = event.target.parentElement;
+    }
+    const link = element?.closest(&quot;a[href]&quot;);
+    const href = link?.getAttribute(&quot;href&quot;);
+    if (href == null) {
+      return;
+    }
+    if (href.startsWith(&quot;#&quot;)) {
+      let id;
+      try {
+        id = decodeURIComponent(href.slice(1));
+      } catch {
+        return;
+      }
+      const target = id.length === 0 ? root : document.getElementById(id);
+      if (
+        target == null ||
+        globalThis.navigator.userActivation?.isActive !== true
+      ) {
+        return;
+      }
+      event.preventDefault();
+      postToHost(&quot;scroll-to&quot;, {
+        top: target.getBoundingClientRect().top + globalThis.scrollY,
+      });
+      return;
+    }
+    event.preventDefault();
+    openExternal({ href });
+  });
+  new ResizeObserver(sendHeight).observe(document.body);
+  syncTheme();
+})();
+&lt;/script&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(
+    --background,
+    var(--color-background-primary, light-dark(rgb(255 255 255), rgb(24 24 24)))
+  ) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: var(
+    --color-background-primary,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --popover: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255), rgb(45 45 45))
+  );
+  --popover-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --primary: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --primary-foreground: var(
+    --color-text-inverse,
+    light-dark(rgb(255 255 255), rgb(13 13 13))
+  );
+  --secondary: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+  );
+  --secondary-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: var(
+    --color-text-secondary,
+    light-dark(rgb(26 28 31 / 49.4%), rgb(255 255 255 / 49.8%))
+  );
+  --accent: var(
+    --color-background-info,
+    light-dark(rgb(229 242 255), rgb(13 39 63))
+  );
+  --accent-foreground: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --destructive: var(
+    --color-text-warning,
+    light-dark(rgb(226 85 7), rgb(255 133 73))
+  );
+  --border: var(
+    --color-border-secondary,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+  --input: var(
+    --color-border-primary,
+    light-dark(
+      rgb(26 28 31 / 11.8%),
+      color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+    )
+  );
+  --ring: var(
+    --color-ring-primary,
+    light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
+  );
+  --font-size-base: var(--font-text-md-size, 14px);
+  --blue: light-dark(rgb(51 156 255), rgb(51 156 255));
+  --orange: light-dark(rgb(226 85 7), rgb(251 106 34));
+  --green: light-dark(rgb(0 162 64), rgb(64 201 119));
+  --red: light-dark(rgb(224 46 42), rgb(255 103 100));
+  --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
+  --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --radius: var(--border-radius-lg, 12.5px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 17'%3E%3Cpath d='M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z'/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  /* Preserve MCP aliases for older inline renderers without creating :root cycles. */
+  --color-background-primary: var(
+    --background,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --color-text-primary: var(
+    --foreground,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --color-border-secondary: var(
+    --border,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+
+  margin: 0;
+  padding: 5px;
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: superellipse(1.5);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: superellipse(1.5);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: superellipse(1.5);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: superellipse(1.5);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+    [aria-pressed=&quot;true&quot;],
+    [aria-selected=&quot;true&quot;],
+    .is-selected
+  ) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+/* Model-authored chart rules can otherwise stretch icons after these styles load. */
+svg.lucide {
+  display: block;
+  width: 16px !important;
+  height: 16px !important;
+  flex: none;
+  margin: 0 !important;
+  stroke-width: 1.6;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;script&gt;
+(() =&gt; {
+  const root = document.documentElement;
+  const initialGlobals =
+    globalThis.__codexVisualizationInitialGlobals ?? globalThis.openai;
+  delete globalThis.__codexVisualizationInitialGlobals;
+  let appliedProperties = [];
+
+  const applyHostStyleVariables = (styleVariables) =&gt; {
+    if (styleVariables == null || typeof styleVariables !== &quot;object&quot;) {
+      return;
+    }
+    for (const property of appliedProperties) {
+      root.style.removeProperty(property);
+    }
+    appliedProperties = [];
+    for (const [property, value] of Object.entries(styleVariables)) {
+      if (property.startsWith(&quot;--&quot;) &amp;&amp; typeof value === &quot;string&quot;) {
+        root.style.setProperty(property, value);
+        appliedProperties.push(property);
+      }
+    }
+  };
+
+  const syncHostStyles = (globals) =&gt; {
+    applyHostStyleVariables(globals?.visualizationStyleVariables);
+  };
+
+  syncHostStyles(initialGlobals);
+  globalThis.addEventListener(&quot;openai:set_globals&quot;, (event) =&gt; {
+    syncHostStyles(event.detail?.globals);
+  });
+})();
+&lt;/script&gt;
+
+&lt;style&gt;
+#alpha-pms-mockup {
+  --apms-bg: light-dark(#eef2f6, #111821);
+  --apms-surface: light-dark(#ffffff, #19232e);
+  --apms-surface-2: light-dark(#f7f9fb, #202c38);
+  --apms-surface-3: light-dark(#eaf0f6, #263544);
+  --apms-text: light-dark(#182331, #e9f0f7);
+  --apms-muted: light-dark(#657386, #a6b5c5);
+  --apms-border: light-dark(#d6dee8, #344555);
+  --apms-primary: light-dark(#176b87, #4ca7c5);
+  --apms-primary-soft: light-dark(#dceff5, #173c4a);
+  --apms-positive: light-dark(#22845f, #54c79a);
+  --apms-warning: light-dark(#a96814, #e1a950);
+  --apms-danger: light-dark(#b84646, #ef8585);
+  --apms-material: light-dark(#3679b9, #69a9e5);
+  --apms-labor: light-dark(#8b5daf, #bf8ee1);
+  --apms-machine: light-dark(#c17a21, #eba94e);
+  --apms-cost: light-dark(#277e69, #55bda1);
+  color: var(--apms-text);
+  font-family: Inter, &quot;Segoe UI&quot;, Arial, sans-serif;
+  background: var(--apms-bg);
+  border: 1px solid var(--apms-border);
+  border-radius: 10px;
+  overflow: hidden;
+  min-width: 0;
+}
+#alpha-pms-mockup * { box-sizing: border-box; }
+#alpha-pms-mockup button, #alpha-pms-mockup input, #alpha-pms-mockup select { font: inherit; }
+#alpha-pms-mockup button { cursor: pointer; }
+.ap-shell { display: grid; grid-template-columns: 208px minmax(0,1fr); min-height: 790px; background: var(--apms-surface); }
+.ap-sidebar { background: light-dark(#172b3a, #0e171f); color: light-dark(#eaf3f7, #dce8ef); padding: 16px 12px; display: flex; flex-direction: column; gap: 18px; }
+.ap-brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px 12px; border-bottom: 1px solid light-dark(#345061, #293b49); }
+.ap-brand-mark { width: 34px; height: 34px; border-radius: 8px; background: light-dark(#39a0bb, #3389a5); display: grid; place-items: center; font-weight: 500; }
+.ap-brand strong { display:block; font-weight:500; }
+.ap-brand small { display:block; color: light-dark(#aac0cc, #8fa9b7); margin-top:2px; }
+.ap-nav { display:grid; gap:4px; }
+.ap-nav button { width:100%; border:0; color:inherit; background:transparent; display:flex; align-items:center; gap:9px; padding:9px 10px; border-radius:7px; text-align:left; }
+.ap-nav button:hover { background: light-dark(#213d4e, #1a2a36); }
+.ap-nav button[aria-selected=&quot;true&quot;] { background: light-dark(#2a5266, #214a5c); color:#fff; }
+.ap-nav svg { width:16px; height:16px; }
+.ap-project-mini { margin-top:auto; padding:10px; background:light-dark(#203a49, #172630); border-radius:8px; }
+.ap-project-mini small { color:light-dark(#aac0cc, #8fa9b7); display:block; }
+.ap-main { min-width:0; display:flex; flex-direction:column; background:var(--apms-surface); }
+.ap-topbar { min-height:58px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 16px; border-bottom:1px solid var(--apms-border); background:var(--apms-surface); }
+.ap-title-wrap { min-width:0; }
+.ap-title-wrap h2 { margin:0; font-size:18px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ap-title-wrap p { margin:3px 0 0; color:var(--apms-muted); font-size:12px; }
+.ap-top-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.ap-btn { border:1px solid var(--apms-border); background:var(--apms-surface); color:var(--apms-text); padding:7px 10px; border-radius:6px; display:inline-flex; align-items:center; gap:6px; }
+.ap-btn.primary { background:var(--apms-primary); color:light-dark(#fff,#081216); border-color:var(--apms-primary); }
+.ap-btn.soft { background:var(--apms-primary-soft); border-color:transparent; color:var(--apms-primary); }
+.ap-screen { display:none; min-width:0; }
+.ap-screen.active { display:block; }
+.ap-toolbar { padding:9px 14px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; border-bottom:1px solid var(--apms-border); background:var(--apms-surface-2); }
+.ap-field { display:flex; align-items:center; gap:6px; color:var(--apms-muted); font-size:12px; }
+.ap-field select, .ap-field input { border:1px solid var(--apms-border); background:var(--apms-surface); color:var(--apms-text); border-radius:5px; padding:6px 8px; }
+.ap-spacer { flex:1; }
+.ap-status { display:inline-flex; align-items:center; gap:5px; padding:4px 7px; border-radius:999px; font-size:11px; background:var(--apms-surface-3); color:var(--apms-muted); white-space:nowrap; }
+.ap-dot { width:7px; height:7px; border-radius:50%; background:var(--apms-positive); }
+.ap-workspace { display:grid; grid-template-columns:minmax(0,1fr) 270px; min-height:668px; }
+.ap-content { min-width:0; border-right:1px solid var(--apms-border); }
+.ap-right { background:var(--apms-surface-2); padding:12px; min-width:0; }
+.ap-right h3, .ap-bottom h3, .ap-chart-panel h3 { margin:0 0 9px; font-size:13px; font-weight:500; }
+.ap-summary { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+.ap-metric { background:var(--apms-surface); border:1px solid var(--apms-border); padding:9px; border-radius:7px; }
+.ap-metric span { display:block; color:var(--apms-muted); font-size:11px; }
+.ap-metric strong { display:block; margin-top:4px; font-size:14px; font-weight:500; }
+.ap-progress { height:7px; background:var(--apms-surface-3); border-radius:999px; overflow:hidden; margin-top:6px; }
+.ap-progress i { display:block; height:100%; background:var(--apms-primary); }
+.ap-table-wrap { overflow:auto; max-width:100%; }
+.ap-table { width:100%; border-collapse:collapse; min-width:790px; font-size:12px; }
+.ap-table th { position:sticky; top:0; z-index:1; background:var(--apms-surface-2); color:var(--apms-muted); font-weight:500; text-align:left; padding:8px; border-bottom:1px solid var(--apms-border); white-space:nowrap; }
+.ap-table td { padding:7px 8px; border-bottom:1px solid var(--apms-border); vertical-align:middle; }
+.ap-table tr[data-row] { cursor:pointer; }
+.ap-table tr[data-row]:hover, .ap-table tr.selected { background:var(--apms-primary-soft); }
+.ap-table .num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.ap-table .center { text-align:center; }
+.ap-tree-name { display:flex; align-items:center; gap:6px; min-width:230px; }
+.ap-indent-1 { padding-left:20px; }
+.ap-indent-2 { padding-left:40px; }
+.ap-indent-3 { padding-left:60px; }
+.ap-node-summary { font-weight:500; }
+.ap-code { font-family:&quot;Cascadia Mono&quot;, Consolas, monospace; color:var(--apms-primary); }
+.ap-tag { font-size:10px; padding:2px 5px; border-radius:4px; background:var(--apms-surface-3); color:var(--apms-muted); }
+.ap-tag.warn { color:var(--apms-warning); background:light-dark(#fff3da,#44341d); }
+.ap-resource-list { display:grid; gap:7px; }
+.ap-resource-row { display:grid; grid-template-columns:10px minmax(0,1fr) auto; gap:7px; align-items:center; padding:7px 0; border-bottom:1px solid var(--apms-border); }
+.ap-resource-row i { width:8px; height:8px; border-radius:2px; }
+.ap-resource-row small { color:var(--apms-muted); display:block; margin-top:2px; }
+.ap-resource-row strong { font-size:12px; font-weight:500; }
+.ap-note { padding:9px; border-left:3px solid var(--apms-warning); background:light-dark(#fff8e9,#382d1e); font-size:11px; color:var(--apms-muted); margin-top:12px; }
+.ap-bottom { border-top:1px solid var(--apms-border); padding:10px 14px; background:var(--apms-surface); }
+.ap-tabs-mini { display:flex; gap:3px; margin-bottom:8px; }
+.ap-tabs-mini button { border:0; background:transparent; color:var(--apms-muted); padding:5px 8px; border-bottom:2px solid transparent; }
+.ap-tabs-mini button.active { color:var(--apms-primary); border-color:var(--apms-primary); }
+
+/* Schedule */
+.ap-schedule-layout { display:grid; grid-template-columns:minmax(0,1fr) 300px; min-height:690px; }
+.ap-form-section { border-bottom:1px solid var(--apms-border); padding-bottom:12px; margin-bottom:12px; }
+.ap-form-section label { display:block; color:var(--apms-muted); font-size:11px; margin-bottom:4px; }
+.ap-form-section input, .ap-form-section select { width:100%; padding:7px 8px; border:1px solid var(--apms-border); border-radius:5px; color:var(--apms-text); background:var(--apms-surface); margin-bottom:8px; }
+.ap-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.ap-allocation { border:1px solid var(--apms-border); background:var(--apms-surface); border-radius:7px; padding:9px; margin-bottom:7px; }
+.ap-allocation header { display:flex; justify-content:space-between; gap:8px; }
+.ap-allocation strong { font-size:11px; font-weight:500; }
+.ap-allocation p { font-size:11px; color:var(--apms-muted); margin:5px 0 0; }
+
+/* Gantt */
+.ap-gantt-wrap { overflow:auto; background:var(--apms-surface); }
+.ap-gantt { min-width:1100px; display:grid; grid-template-columns:390px 1fr; font-size:11px; }
+.ap-gantt-left, .ap-gantt-right { min-width:0; }
+.ap-gantt-left { border-right:1px solid var(--apms-border); }
+.ap-gantt-header { height:48px; background:var(--apms-surface-2); border-bottom:1px solid var(--apms-border); display:grid; grid-template-columns:52px 1fr 74px 74px; align-items:center; color:var(--apms-muted); }
+.ap-gantt-header span { padding:0 7px; }
+.ap-gantt-row { height:34px; display:grid; grid-template-columns:52px 1fr 74px 74px; align-items:center; border-bottom:1px solid var(--apms-border); }
+.ap-gantt-row &gt; span { padding:0 7px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.ap-gantt-row.summary { background:var(--apms-surface-2); font-weight:500; }
+.ap-timescale { height:48px; display:grid; grid-template-rows:24px 24px; background:var(--apms-surface-2); border-bottom:1px solid var(--apms-border); }
+.ap-months { display:grid; grid-template-columns:4fr 4fr 4fr; }
+.ap-weeks { display:grid; grid-template-columns:repeat(12,1fr); }
+.ap-months span,.ap-weeks span { display:grid; place-items:center; border-right:1px solid var(--apms-border); color:var(--apms-muted); }
+.ap-chart-row { height:34px; position:relative; border-bottom:1px solid var(--apms-border); background-image:linear-gradient(to right,var(--apms-border) 1px,transparent 1px); background-size:calc(100% / 12) 100%; }
+.ap-bar { position:absolute; top:8px; height:18px; border-radius:4px; background:var(--apms-primary); color:light-dark(#fff,#081216); padding:2px 6px; white-space:nowrap; overflow:hidden; font-size:10px; }
+.ap-bar.summary { top:14px; height:6px; border-radius:0; }
+.ap-bar.summary:before,.ap-bar.summary:after { content:&quot;&quot;; position:absolute; top:0; width:5px; height:11px; background:inherit; }
+.ap-bar.summary:before { left:0; } .ap-bar.summary:after { right:0; }
+.ap-bar.late { background:var(--apms-warning); }
+.ap-bar.critical { background:var(--apms-danger); }
+.ap-today { position:absolute; left:59%; top:0; bottom:0; border-left:2px solid var(--apms-danger); pointer-events:none; }
+
+/* Resources */
+.ap-resources { padding:14px; background:var(--apms-surface-2); }
+.ap-resource-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:12px; }
+.ap-resource-kpi { background:var(--apms-surface); border:1px solid var(--apms-border); border-radius:8px; padding:10px; }
+.ap-resource-kpi span { color:var(--apms-muted); font-size:11px; display:block; }
+.ap-resource-kpi strong { font-size:17px; font-weight:500; display:block; margin:4px 0; }
+.ap-resource-kpi small { color:var(--apms-muted); }
+.ap-charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.ap-chart-panel { background:var(--apms-surface); border:1px solid var(--apms-border); border-radius:8px; padding:11px; min-width:0; }
+.ap-chart-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.ap-chart-head p { margin:2px 0 8px; color:var(--apms-muted); font-size:11px; }
+.ap-chart-svg { width:100%; height:auto; display:block; }
+.ap-chart-svg text { fill:var(--apms-muted); font-size:9px; }
+.ap-chart-svg .axis { stroke:var(--apms-border); stroke-width:1; }
+.ap-chart-svg .grid { stroke:var(--apms-border); stroke-width:1; opacity:.65; }
+.ap-legend { display:flex; gap:12px; flex-wrap:wrap; font-size:10px; color:var(--apms-muted); }
+.ap-legend span { display:inline-flex; align-items:center; gap:5px; }
+.ap-legend i { width:9px; height:9px; border-radius:2px; }
+
+@media (max-width: 760px) {
+  .ap-shell { grid-template-columns:1fr; }
+  .ap-sidebar { padding:10px; gap:10px; }
+  .ap-brand { border-bottom:0; padding-bottom:4px; }
+  .ap-nav { grid-template-columns:repeat(4,1fr); }
+  .ap-nav button { justify-content:center; padding:8px 4px; }
+  .ap-nav button span { display:none; }
+  .ap-project-mini { display:none; }
+  .ap-workspace,.ap-schedule-layout { grid-template-columns:1fr; }
+  .ap-content { border-right:0; }
+  .ap-right { border-top:1px solid var(--apms-border); }
+  .ap-resource-kpis,.ap-charts-grid { grid-template-columns:1fr 1fr; }
+}
+@media (max-width: 480px) {
+  .ap-topbar { align-items:flex-start; }
+  .ap-top-actions .ap-btn:not(.primary) { display:none; }
+  .ap-resource-kpis,.ap-charts-grid { grid-template-columns:1fr; }
+  .ap-summary { grid-template-columns:1fr; }
+}
+&lt;/style&gt;
+
+&lt;div id=&quot;alpha-pms-mockup&quot;&gt;
+  &lt;div class=&quot;ap-shell&quot;&gt;
+    &lt;aside class=&quot;ap-sidebar&quot;&gt;
+      &lt;div class=&quot;ap-brand&quot;&gt;
+        &lt;div class=&quot;ap-brand-mark&quot;&gt;A&lt;/div&gt;
+        &lt;div&gt;&lt;strong&gt;AlphaPMS&lt;/strong&gt;&lt;small&gt;Construction Planning&lt;/small&gt;&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;nav class=&quot;ap-nav&quot; aria-label=&quot;Chuyển màn hình&quot;&gt;
+        &lt;button type=&quot;button&quot; data-screen=&quot;estimate&quot; aria-selected=&quot;true&quot;&gt;&lt;i data-lucide=&quot;calculator&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;Dự toán&lt;/span&gt;&lt;/button&gt;
+        &lt;button type=&quot;button&quot; data-screen=&quot;schedule&quot; aria-selected=&quot;false&quot;&gt;&lt;i data-lucide=&quot;list-tree&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;Tiến độ&lt;/span&gt;&lt;/button&gt;
+        &lt;button type=&quot;button&quot; data-screen=&quot;gantt&quot; aria-selected=&quot;false&quot;&gt;&lt;i data-lucide=&quot;gantt-chart&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;Biểu đồ Gantt&lt;/span&gt;&lt;/button&gt;
+        &lt;button type=&quot;button&quot; data-screen=&quot;resources&quot; aria-selected=&quot;false&quot;&gt;&lt;i data-lucide=&quot;chart-no-axes-combined&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;Nguồn lực&lt;/span&gt;&lt;/button&gt;
+      &lt;/nav&gt;
+      &lt;div class=&quot;ap-project-mini&quot;&gt;&lt;small&gt;Dự án đang mở&lt;/small&gt;&lt;strong&gt;Tuyến thoát nước KĐT Bắc An&lt;/strong&gt;&lt;small&gt;Cập nhật 17/08/2026&lt;/small&gt;&lt;/div&gt;
+    &lt;/aside&gt;
+
+    &lt;main class=&quot;ap-main&quot;&gt;
+      &lt;header class=&quot;ap-topbar&quot;&gt;
+        &lt;div class=&quot;ap-title-wrap&quot;&gt;&lt;h2 id=&quot;ap-screen-title&quot;&gt;Quản lý dự toán&lt;/h2&gt;&lt;p&gt;Tuyến thoát nước KĐT Bắc An · Phiên bản dự toán DT-03&lt;/p&gt;&lt;/div&gt;
+        &lt;div class=&quot;ap-top-actions&quot;&gt;&lt;button class=&quot;ap-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;history&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;Lịch sử&lt;/button&gt;&lt;button class=&quot;ap-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;file-down&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;Xuất Excel&lt;/button&gt;&lt;button class=&quot;ap-btn primary&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;save&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;Lưu thay đổi&lt;/button&gt;&lt;/div&gt;
+      &lt;/header&gt;
+
+      &lt;!-- 1. ESTIMATE --&gt;
+      &lt;section class=&quot;ap-screen active&quot; data-screen-panel=&quot;estimate&quot;&gt;
+        &lt;div class=&quot;ap-toolbar&quot;&gt;
+          &lt;button class=&quot;ap-btn soft&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;plus&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;Thêm hạng mục&lt;/button&gt;
+          &lt;button class=&quot;ap-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;search&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;Tra công tác&lt;/button&gt;
+          &lt;button class=&quot;ap-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;file-spreadsheet&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;Nhập BOQ&lt;/button&gt;
+          &lt;span class=&quot;ap-spacer&quot;&gt;&lt;/span&gt;
+          &lt;label class=&quot;ap-field&quot;&gt;Bộ định mức &lt;select&gt;&lt;option&gt;TT 38/2026/TT-BXD&lt;/option&gt;&lt;option&gt;TT 12/2021/TT-BXD&lt;/option&gt;&lt;/select&gt;&lt;/label&gt;
+          &lt;span class=&quot;ap-status&quot;&gt;&lt;i class=&quot;ap-dot&quot;&gt;&lt;/i&gt;Đã tính lại&lt;/span&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;ap-workspace&quot;&gt;
+          &lt;div class=&quot;ap-content&quot;&gt;
+            &lt;div class=&quot;ap-table-wrap&quot;&gt;
+              &lt;table class=&quot;ap-table&quot; aria-label=&quot;Bảng quản lý dự toán&quot;&gt;
+                &lt;thead&gt;&lt;tr&gt;&lt;th&gt;STT&lt;/th&gt;&lt;th&gt;Mã hiệu / Tên công việc&lt;/th&gt;&lt;th&gt;Đơn vị&lt;/th&gt;&lt;th class=&quot;num&quot;&gt;Khối lượng&lt;/th&gt;&lt;th class=&quot;num&quot;&gt;Đơn giá&lt;/th&gt;&lt;th class=&quot;num&quot;&gt;Thành tiền&lt;/th&gt;&lt;th&gt;Trạng thái&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+                &lt;tbody&gt;
+                  &lt;tr class=&quot;ap-node-summary&quot;&gt;&lt;td&gt;1&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name&quot;&gt;&lt;i data-lucide=&quot;chevron-down&quot;&gt;&lt;/i&gt;HẠNG MỤC THOÁT NƯỚC MƯA&lt;/div&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;18.426.580.000&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag&quot;&gt;Đủ dữ liệu&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+                  &lt;tr class=&quot;ap-node-summary&quot;&gt;&lt;td&gt;1.1&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name ap-indent-1&quot;&gt;&lt;i data-lucide=&quot;chevron-down&quot;&gt;&lt;/i&gt;Đoạn tuyến KM0+000 – KM0+480&lt;/div&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;7.890.420.000&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag&quot;&gt;Đủ dữ liệu&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+                  &lt;tr data-row=&quot;AB.11323&quot; class=&quot;selected&quot;&gt;&lt;td&gt;1.1.1&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name ap-indent-2&quot;&gt;&lt;span class=&quot;ap-code&quot;&gt;AB.11323&lt;/span&gt; Đào đất móng cống bằng máy&lt;/div&gt;&lt;/td&gt;&lt;td&gt;100 m³&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;12,500&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;3.825.460&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;47.818.250&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag&quot;&gt;Định mức chuẩn&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+                  &lt;tr data-row=&quot;AM.21231&quot;&gt;&lt;td&gt;1.1.2&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name ap-indent-2&quot;&gt;&lt;span class=&quot;ap-code&quot;&gt;AM.21231&lt;/span&gt; Vận chuyển đất bằng ô tô 10T&lt;/div&gt;&lt;/td&gt;&lt;td&gt;100 m³&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;12,500&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;4.152.300&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;51.903.750&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag warn&quot;&gt;Thiếu cự ly&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+                  &lt;tr data-row=&quot;AF.11111&quot;&gt;&lt;td&gt;1.1.3&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name ap-indent-2&quot;&gt;&lt;span class=&quot;ap-code&quot;&gt;AF.11111&lt;/span&gt; Bê tông lót đáy cống M100&lt;/div&gt;&lt;/td&gt;&lt;td&gt;m³&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;120,000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;1.284.650&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;154.158.000&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag&quot;&gt;Đã hiệu chỉnh&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+                  &lt;tr data-row=&quot;BB.22410&quot;&gt;&lt;td&gt;1.1.4&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name ap-indent-2&quot;&gt;&lt;span class=&quot;ap-code&quot;&gt;BB.22410&lt;/span&gt; Lắp đặt ống cống BTCT D600&lt;/div&gt;&lt;/td&gt;&lt;td&gt;m&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;480,000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;2.416.800&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;1.160.064.000&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag&quot;&gt;Định mức chuẩn&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+                  &lt;tr data-row=&quot;TT.001&quot;&gt;&lt;td&gt;1.1.5&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name ap-indent-2&quot;&gt;&lt;span class=&quot;ap-code&quot;&gt;TT.001&lt;/span&gt; Cung cấp ống cống D600&lt;/div&gt;&lt;/td&gt;&lt;td&gt;m&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;480,000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;1.890.000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;907.200.000&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag&quot;&gt;Tạm tính&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+                  &lt;tr class=&quot;ap-node-summary&quot;&gt;&lt;td&gt;1.2&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name ap-indent-1&quot;&gt;&lt;i data-lucide=&quot;chevron-right&quot;&gt;&lt;/i&gt;Hố ga thu nước&lt;/div&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;3.114.620.000&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag&quot;&gt;12 công tác&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+                  &lt;tr class=&quot;ap-node-summary&quot;&gt;&lt;td&gt;1.3&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name ap-indent-1&quot;&gt;&lt;i data-lucide=&quot;chevron-right&quot;&gt;&lt;/i&gt;Hoàn trả mặt đường&lt;/div&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;7.421.540.000&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag&quot;&gt;9 công tác&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+                &lt;/tbody&gt;
+              &lt;/table&gt;
+            &lt;/div&gt;
+            &lt;div class=&quot;ap-bottom&quot;&gt;
+              &lt;div class=&quot;ap-tabs-mini&quot;&gt;&lt;button class=&quot;active&quot; type=&quot;button&quot;&gt;Hao phí định mức&lt;/button&gt;&lt;button type=&quot;button&quot;&gt;Diễn giải khối lượng&lt;/button&gt;&lt;button type=&quot;button&quot;&gt;Lịch sử hiệu chỉnh&lt;/button&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-table-wrap&quot;&gt;&lt;table class=&quot;ap-table ap-table-detail&quot; aria-label=&quot;Hao phí công tác&quot;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Loại&lt;/th&gt;&lt;th&gt;Mã tài nguyên&lt;/th&gt;&lt;th&gt;Tên tài nguyên&lt;/th&gt;&lt;th&gt;Đơn vị&lt;/th&gt;&lt;th class=&quot;num&quot;&gt;Hao phí gốc&lt;/th&gt;&lt;th class=&quot;num&quot;&gt;Hệ số&lt;/th&gt;&lt;th class=&quot;num&quot;&gt;Giá hiện trường&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;Nhân công&lt;/td&gt;&lt;td&gt;NC.0035&lt;/td&gt;&lt;td&gt;Nhân công 3,5/7&lt;/td&gt;&lt;td&gt;công&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;0,7800&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;1,000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;347.500&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Máy&lt;/td&gt;&lt;td&gt;M.0102&lt;/td&gt;&lt;td&gt;Máy đào 1,25 m³&lt;/td&gt;&lt;td&gt;ca&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;0,3200&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;1,000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;4.821.200&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Máy&lt;/td&gt;&lt;td&gt;M.0205&lt;/td&gt;&lt;td&gt;Máy ủi 110 CV&lt;/td&gt;&lt;td&gt;ca&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;0,0800&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;1,000&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;3.254.100&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+          &lt;aside class=&quot;ap-right&quot;&gt;
+            &lt;h3&gt;Tổng hợp dự toán&lt;/h3&gt;
+            &lt;div class=&quot;ap-summary&quot;&gt;&lt;div class=&quot;ap-metric&quot;&gt;&lt;span&gt;Trước thuế&lt;/span&gt;&lt;strong&gt;18,43 tỷ&lt;/strong&gt;&lt;/div&gt;&lt;div class=&quot;ap-metric&quot;&gt;&lt;span&gt;Sau thuế&lt;/span&gt;&lt;strong&gt;20,27 tỷ&lt;/strong&gt;&lt;/div&gt;&lt;div class=&quot;ap-metric&quot;&gt;&lt;span&gt;Vật liệu&lt;/span&gt;&lt;strong&gt;11,92 tỷ&lt;/strong&gt;&lt;/div&gt;&lt;div class=&quot;ap-metric&quot;&gt;&lt;span&gt;NC + Máy&lt;/span&gt;&lt;strong&gt;4,84 tỷ&lt;/strong&gt;&lt;/div&gt;&lt;/div&gt;
+            &lt;h3&gt;Mức độ hoàn thiện&lt;/h3&gt;&lt;div class=&quot;ap-progress&quot;&gt;&lt;i style=&quot;width:84%&quot;&gt;&lt;/i&gt;&lt;/div&gt;&lt;p style=&quot;font-size:11px;color:var(--apms-muted);margin:6px 0 14px&quot;&gt;42/50 công tác đã đủ khối lượng, hao phí và giá.&lt;/p&gt;
+            &lt;h3&gt;Cảnh báo cần xử lý&lt;/h3&gt;
+            &lt;div class=&quot;ap-resource-list&quot;&gt;&lt;div class=&quot;ap-resource-row&quot;&gt;&lt;i style=&quot;background:var(--apms-warning)&quot;&gt;&lt;/i&gt;&lt;div&gt;&lt;strong&gt;3 công tác thiếu giá&lt;/strong&gt;&lt;small&gt;Chưa có giá hiện trường&lt;/small&gt;&lt;/div&gt;&lt;span&gt;→&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;ap-resource-row&quot;&gt;&lt;i style=&quot;background:var(--apms-danger)&quot;&gt;&lt;/i&gt;&lt;div&gt;&lt;strong&gt;1 công tác sai đơn vị&lt;/strong&gt;&lt;small&gt;Khác đơn vị định mức gốc&lt;/small&gt;&lt;/div&gt;&lt;span&gt;→&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;ap-resource-row&quot;&gt;&lt;i style=&quot;background:var(--apms-primary)&quot;&gt;&lt;/i&gt;&lt;div&gt;&lt;strong&gt;4 công tác đã sửa hao phí&lt;/strong&gt;&lt;small&gt;Cần giải trình khi phát hành&lt;/small&gt;&lt;/div&gt;&lt;span&gt;→&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
+            &lt;div class=&quot;ap-note&quot;&gt;Dự toán đang dùng bộ quy tắc chi phí theo TT 36/2026/TT-BXD, hiệu lực từ 01/07/2026.&lt;/div&gt;
+          &lt;/aside&gt;
+        &lt;/div&gt;
+      &lt;/section&gt;
+
+      &lt;!-- 2. SCHEDULE --&gt;
+      &lt;section class=&quot;ap-screen&quot; data-screen-panel=&quot;schedule&quot;&gt;
+        &lt;div class=&quot;ap-toolbar&quot;&gt;&lt;button class=&quot;ap-btn soft&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;plus&quot;&gt;&lt;/i&gt;Thêm công việc&lt;/button&gt;&lt;button class=&quot;ap-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;indent-increase&quot;&gt;&lt;/i&gt;Đẩy vào&lt;/button&gt;&lt;button class=&quot;ap-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;indent-decrease&quot;&gt;&lt;/i&gt;Đẩy ra&lt;/button&gt;&lt;button class=&quot;ap-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;link-2&quot;&gt;&lt;/i&gt;Phân bổ BOQ&lt;/button&gt;&lt;span class=&quot;ap-spacer&quot;&gt;&lt;/span&gt;&lt;label class=&quot;ap-field&quot;&gt;Phiên bản &lt;select&gt;&lt;option&gt;Kế hoạch điều chỉnh 02&lt;/option&gt;&lt;option&gt;Baseline 01&lt;/option&gt;&lt;/select&gt;&lt;/label&gt;&lt;/div&gt;
+        &lt;div class=&quot;ap-schedule-layout&quot;&gt;
+          &lt;div class=&quot;ap-content&quot;&gt;&lt;div class=&quot;ap-table-wrap&quot;&gt;&lt;table class=&quot;ap-table&quot; aria-label=&quot;Cây tiến độ&quot;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;WBS&lt;/th&gt;&lt;th&gt;Tên công việc&lt;/th&gt;&lt;th&gt;Bắt đầu&lt;/th&gt;&lt;th&gt;Kết thúc&lt;/th&gt;&lt;th class=&quot;num&quot;&gt;Thời lượng&lt;/th&gt;&lt;th class=&quot;num&quot;&gt;KL phân bổ&lt;/th&gt;&lt;th&gt;Trạng thái&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;
+            &lt;tr class=&quot;ap-node-summary&quot;&gt;&lt;td&gt;1&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name&quot;&gt;&lt;i data-lucide=&quot;chevron-down&quot;&gt;&lt;/i&gt;HẠNG MỤC THOÁT NƯỚC MƯA&lt;/div&gt;&lt;/td&gt;&lt;td&gt;20/08/2026&lt;/td&gt;&lt;td&gt;18/12/2026&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;103 ngày&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag&quot;&gt;Tổng hợp&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+            &lt;tr class=&quot;ap-node-summary&quot;&gt;&lt;td&gt;1.1&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name ap-indent-1&quot;&gt;&lt;i data-lucide=&quot;chevron-down&quot;&gt;&lt;/i&gt;Đoạn KM0+000 – KM0+480&lt;/div&gt;&lt;/td&gt;&lt;td&gt;20/08/2026&lt;/td&gt;&lt;td&gt;21/10/2026&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;54 ngày&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag&quot;&gt;Tổng hợp&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+            &lt;tr data-row class=&quot;selected&quot;&gt;&lt;td&gt;1.1.1&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name ap-indent-2&quot;&gt;Thi công cống D600 đoạn 1&lt;/div&gt;&lt;/td&gt;&lt;td&gt;20/08/2026&lt;/td&gt;&lt;td&gt;15/09/2026&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;23 ngày&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;240 m&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag&quot;&gt;Đã phân bổ&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+            &lt;tr data-row&gt;&lt;td&gt;1.1.2&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name ap-indent-2&quot;&gt;Thi công cống D600 đoạn 2&lt;/div&gt;&lt;/td&gt;&lt;td&gt;05/09/2026&lt;/td&gt;&lt;td&gt;02/10/2026&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;24 ngày&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;240 m&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag&quot;&gt;Đã phân bổ&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+            &lt;tr data-row&gt;&lt;td&gt;1.1.3&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name ap-indent-2&quot;&gt;Thi công hố ga G01–G06&lt;/div&gt;&lt;/td&gt;&lt;td&gt;09/09/2026&lt;/td&gt;&lt;td&gt;21/10/2026&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;37 ngày&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;6 cái&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag warn&quot;&gt;Phân bổ 72%&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+            &lt;tr class=&quot;ap-node-summary&quot;&gt;&lt;td&gt;1.2&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name ap-indent-1&quot;&gt;&lt;i data-lucide=&quot;chevron-down&quot;&gt;&lt;/i&gt;Hoàn trả và nghiệm thu&lt;/div&gt;&lt;/td&gt;&lt;td&gt;22/10/2026&lt;/td&gt;&lt;td&gt;18/12/2026&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;50 ngày&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag&quot;&gt;Tổng hợp&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+            &lt;tr data-row&gt;&lt;td&gt;1.2.1&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name ap-indent-2&quot;&gt;Hoàn trả nền đường&lt;/div&gt;&lt;/td&gt;&lt;td&gt;22/10/2026&lt;/td&gt;&lt;td&gt;20/11/2026&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;26 ngày&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;3.850 m²&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag&quot;&gt;Đã phân bổ&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+            &lt;tr data-row&gt;&lt;td&gt;1.2.2&lt;/td&gt;&lt;td&gt;&lt;div class=&quot;ap-tree-name ap-indent-2&quot;&gt;Thử kín và nghiệm thu&lt;/div&gt;&lt;/td&gt;&lt;td&gt;21/11/2026&lt;/td&gt;&lt;td&gt;18/12/2026&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;24 ngày&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;480 m&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ap-tag warn&quot;&gt;Chưa có BOQ&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+          &lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;/div&gt;
+          &lt;aside class=&quot;ap-right&quot;&gt;
+            &lt;h3&gt;Chi tiết công việc tiến độ&lt;/h3&gt;
+            &lt;div class=&quot;ap-form-section&quot;&gt;&lt;label&gt;Tên công việc&lt;/label&gt;&lt;input value=&quot;Thi công cống D600 đoạn 1&quot;&gt;&lt;div class=&quot;ap-form-grid&quot;&gt;&lt;div&gt;&lt;label&gt;Ngày bắt đầu&lt;/label&gt;&lt;input type=&quot;date&quot; value=&quot;2026-08-20&quot;&gt;&lt;/div&gt;&lt;div&gt;&lt;label&gt;Ngày kết thúc&lt;/label&gt;&lt;input type=&quot;date&quot; value=&quot;2026-09-15&quot;&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;ap-form-grid&quot;&gt;&lt;div&gt;&lt;label&gt;Lịch làm việc&lt;/label&gt;&lt;select&gt;&lt;option&gt;6 ngày/tuần&lt;/option&gt;&lt;/select&gt;&lt;/div&gt;&lt;div&gt;&lt;label&gt;Phân bổ nguồn lực&lt;/label&gt;&lt;select&gt;&lt;option&gt;Chia đều theo ngày&lt;/option&gt;&lt;/select&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
+            &lt;h3&gt;Khối lượng BOQ đã phân bổ&lt;/h3&gt;
+            &lt;div class=&quot;ap-allocation&quot;&gt;&lt;header&gt;&lt;strong&gt;BB.22410 · Lắp cống D600&lt;/strong&gt;&lt;span&gt;240/480 m&lt;/span&gt;&lt;/header&gt;&lt;div class=&quot;ap-progress&quot;&gt;&lt;i style=&quot;width:50%&quot;&gt;&lt;/i&gt;&lt;/div&gt;&lt;p&gt;50% khối lượng BOQ · Nguồn: DT-03&lt;/p&gt;&lt;/div&gt;
+            &lt;div class=&quot;ap-allocation&quot;&gt;&lt;header&gt;&lt;strong&gt;AB.11323 · Đào móng cống&lt;/strong&gt;&lt;span&gt;625/1.250 m³&lt;/span&gt;&lt;/header&gt;&lt;div class=&quot;ap-progress&quot;&gt;&lt;i style=&quot;width:50%&quot;&gt;&lt;/i&gt;&lt;/div&gt;&lt;p&gt;Phân bổ theo tỷ lệ chiều dài tuyến&lt;/p&gt;&lt;/div&gt;
+            &lt;div class=&quot;ap-allocation&quot;&gt;&lt;header&gt;&lt;strong&gt;AM.21231 · Vận chuyển đất&lt;/strong&gt;&lt;span&gt;625/1.250 m³&lt;/span&gt;&lt;/header&gt;&lt;div class=&quot;ap-progress&quot;&gt;&lt;i style=&quot;width:50%&quot;&gt;&lt;/i&gt;&lt;/div&gt;&lt;p&gt;Đi kèm khối lượng đào đất&lt;/p&gt;&lt;/div&gt;
+            &lt;button class=&quot;ap-btn soft&quot; style=&quot;width:100%;justify-content:center&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;link-2&quot;&gt;&lt;/i&gt;Quản lý phân bổ BOQ&lt;/button&gt;
+            &lt;div class=&quot;ap-note&quot;&gt;Tổng phân bổ của từng công tác dự toán không được vượt khối lượng BOQ đã duyệt.&lt;/div&gt;
+          &lt;/aside&gt;
+        &lt;/div&gt;
+      &lt;/section&gt;
+
+      &lt;!-- 3. GANTT --&gt;
+      &lt;section class=&quot;ap-screen&quot; data-screen-panel=&quot;gantt&quot;&gt;
+        &lt;div class=&quot;ap-toolbar&quot;&gt;&lt;label class=&quot;ap-field&quot;&gt;Khoảng hiển thị &lt;select&gt;&lt;option&gt;Tháng 8 – 11/2026&lt;/option&gt;&lt;/select&gt;&lt;/label&gt;&lt;button class=&quot;ap-btn&quot; type=&quot;button&quot;&gt;Ngày&lt;/button&gt;&lt;button class=&quot;ap-btn soft&quot; type=&quot;button&quot;&gt;Tuần&lt;/button&gt;&lt;button class=&quot;ap-btn&quot; type=&quot;button&quot;&gt;Tháng&lt;/button&gt;&lt;span class=&quot;ap-spacer&quot;&gt;&lt;/span&gt;&lt;span class=&quot;ap-status&quot;&gt;&lt;i class=&quot;ap-dot&quot;&gt;&lt;/i&gt;Baseline 01 đang hiển thị&lt;/span&gt;&lt;button class=&quot;ap-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;git-compare&quot;&gt;&lt;/i&gt;So sánh phiên bản&lt;/button&gt;&lt;/div&gt;
+        &lt;div class=&quot;ap-gantt-wrap&quot;&gt;
+          &lt;div class=&quot;ap-gantt&quot;&gt;
+            &lt;div class=&quot;ap-gantt-left&quot;&gt;
+              &lt;div class=&quot;ap-gantt-header&quot;&gt;&lt;span&gt;WBS&lt;/span&gt;&lt;span&gt;Tên công việc&lt;/span&gt;&lt;span&gt;Bắt đầu&lt;/span&gt;&lt;span&gt;Kết thúc&lt;/span&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-gantt-row summary&quot;&gt;&lt;span&gt;1&lt;/span&gt;&lt;span&gt;Thoát nước mưa&lt;/span&gt;&lt;span&gt;20/08&lt;/span&gt;&lt;span&gt;18/12&lt;/span&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-gantt-row summary&quot;&gt;&lt;span&gt;1.1&lt;/span&gt;&lt;span&gt;Đoạn KM0+000 – KM0+480&lt;/span&gt;&lt;span&gt;20/08&lt;/span&gt;&lt;span&gt;21/10&lt;/span&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-gantt-row&quot;&gt;&lt;span&gt;1.1.1&lt;/span&gt;&lt;span&gt;Thi công cống D600 đoạn 1&lt;/span&gt;&lt;span&gt;20/08&lt;/span&gt;&lt;span&gt;15/09&lt;/span&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-gantt-row&quot;&gt;&lt;span&gt;1.1.2&lt;/span&gt;&lt;span&gt;Thi công cống D600 đoạn 2&lt;/span&gt;&lt;span&gt;05/09&lt;/span&gt;&lt;span&gt;02/10&lt;/span&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-gantt-row&quot;&gt;&lt;span&gt;1.1.3&lt;/span&gt;&lt;span&gt;Thi công hố ga G01–G06&lt;/span&gt;&lt;span&gt;09/09&lt;/span&gt;&lt;span&gt;21/10&lt;/span&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-gantt-row summary&quot;&gt;&lt;span&gt;1.2&lt;/span&gt;&lt;span&gt;Hoàn trả và nghiệm thu&lt;/span&gt;&lt;span&gt;22/10&lt;/span&gt;&lt;span&gt;18/12&lt;/span&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-gantt-row&quot;&gt;&lt;span&gt;1.2.1&lt;/span&gt;&lt;span&gt;Hoàn trả nền đường&lt;/span&gt;&lt;span&gt;22/10&lt;/span&gt;&lt;span&gt;20/11&lt;/span&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-gantt-row&quot;&gt;&lt;span&gt;1.2.2&lt;/span&gt;&lt;span&gt;Thử kín và nghiệm thu&lt;/span&gt;&lt;span&gt;21/11&lt;/span&gt;&lt;span&gt;18/12&lt;/span&gt;&lt;/div&gt;
+            &lt;/div&gt;
+            &lt;div class=&quot;ap-gantt-right&quot;&gt;
+              &lt;div class=&quot;ap-timescale&quot;&gt;&lt;div class=&quot;ap-months&quot;&gt;&lt;span&gt;Tháng 8&lt;/span&gt;&lt;span&gt;Tháng 9&lt;/span&gt;&lt;span&gt;Tháng 10&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;ap-weeks&quot;&gt;&lt;span&gt;W34&lt;/span&gt;&lt;span&gt;W35&lt;/span&gt;&lt;span&gt;W36&lt;/span&gt;&lt;span&gt;W37&lt;/span&gt;&lt;span&gt;W38&lt;/span&gt;&lt;span&gt;W39&lt;/span&gt;&lt;span&gt;W40&lt;/span&gt;&lt;span&gt;W41&lt;/span&gt;&lt;span&gt;W42&lt;/span&gt;&lt;span&gt;W43&lt;/span&gt;&lt;span&gt;W44&lt;/span&gt;&lt;span&gt;W45&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-chart-row&quot;&gt;&lt;div class=&quot;ap-bar summary&quot; style=&quot;left:2%;width:96%&quot;&gt;&lt;/div&gt;&lt;div class=&quot;ap-today&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-chart-row&quot;&gt;&lt;div class=&quot;ap-bar summary&quot; style=&quot;left:2%;width:54%&quot;&gt;&lt;/div&gt;&lt;div class=&quot;ap-today&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-chart-row&quot;&gt;&lt;div class=&quot;ap-bar&quot; style=&quot;left:2%;width:23%&quot;&gt;23 ngày&lt;/div&gt;&lt;div class=&quot;ap-today&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-chart-row&quot;&gt;&lt;div class=&quot;ap-bar&quot; style=&quot;left:16%;width:24%&quot;&gt;24 ngày&lt;/div&gt;&lt;div class=&quot;ap-today&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-chart-row&quot;&gt;&lt;div class=&quot;ap-bar late&quot; style=&quot;left:20%;width:36%&quot;&gt;37 ngày · +4 ngày&lt;/div&gt;&lt;div class=&quot;ap-today&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-chart-row&quot;&gt;&lt;div class=&quot;ap-bar summary&quot; style=&quot;left:57%;width:41%&quot;&gt;&lt;/div&gt;&lt;div class=&quot;ap-today&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-chart-row&quot;&gt;&lt;div class=&quot;ap-bar&quot; style=&quot;left:57%;width:25%&quot;&gt;26 ngày&lt;/div&gt;&lt;div class=&quot;ap-today&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+              &lt;div class=&quot;ap-chart-row&quot;&gt;&lt;div class=&quot;ap-bar critical&quot; style=&quot;left:82%;width:16%&quot;&gt;24 ngày&lt;/div&gt;&lt;div class=&quot;ap-today&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;ap-bottom&quot;&gt;&lt;div class=&quot;ap-legend&quot;&gt;&lt;span&gt;&lt;i style=&quot;background:var(--apms-primary)&quot;&gt;&lt;/i&gt;Công việc bình thường&lt;/span&gt;&lt;span&gt;&lt;i style=&quot;background:var(--apms-warning)&quot;&gt;&lt;/i&gt;Chậm so với baseline&lt;/span&gt;&lt;span&gt;&lt;i style=&quot;background:var(--apms-danger)&quot;&gt;&lt;/i&gt;Đường găng&lt;/span&gt;&lt;span&gt;&lt;i style=&quot;width:2px;background:var(--apms-danger)&quot;&gt;&lt;/i&gt;Ngày dữ liệu: 28/09/2026&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
+      &lt;/section&gt;
+
+      &lt;!-- 4. RESOURCE CHARTS --&gt;
+      &lt;section class=&quot;ap-screen&quot; data-screen-panel=&quot;resources&quot;&gt;
+        &lt;div class=&quot;ap-toolbar&quot;&gt;&lt;label class=&quot;ap-field&quot;&gt;Phạm vi &lt;select&gt;&lt;option&gt;Toàn dự án&lt;/option&gt;&lt;option&gt;Hạng mục thoát nước mưa&lt;/option&gt;&lt;/select&gt;&lt;/label&gt;&lt;label class=&quot;ap-field&quot;&gt;Chu kỳ &lt;select id=&quot;ap-period&quot;&gt;&lt;option value=&quot;week&quot;&gt;Theo tuần&lt;/option&gt;&lt;option value=&quot;month&quot;&gt;Theo tháng&lt;/option&gt;&lt;/select&gt;&lt;/label&gt;&lt;label class=&quot;ap-field&quot;&gt;Phiên bản &lt;select&gt;&lt;option&gt;Kế hoạch điều chỉnh 02&lt;/option&gt;&lt;option&gt;Baseline 01&lt;/option&gt;&lt;/select&gt;&lt;/label&gt;&lt;span class=&quot;ap-spacer&quot;&gt;&lt;/span&gt;&lt;button class=&quot;ap-btn&quot; type=&quot;button&quot;&gt;&lt;i data-lucide=&quot;sliders-horizontal&quot;&gt;&lt;/i&gt;Giới hạn nguồn lực&lt;/button&gt;&lt;/div&gt;
+        &lt;div class=&quot;ap-resources&quot;&gt;
+          &lt;div class=&quot;ap-resource-kpis&quot;&gt;&lt;div class=&quot;ap-resource-kpi&quot;&gt;&lt;span&gt;Đỉnh nhân lực&lt;/span&gt;&lt;strong&gt;42 người&lt;/strong&gt;&lt;small&gt;Tuần 39 · vượt giới hạn 6&lt;/small&gt;&lt;/div&gt;&lt;div class=&quot;ap-resource-kpi&quot;&gt;&lt;span&gt;Đỉnh nhu cầu máy&lt;/span&gt;&lt;strong&gt;9,4 ca/ngày&lt;/strong&gt;&lt;small&gt;Máy đào và ô tô vận chuyển&lt;/small&gt;&lt;/div&gt;&lt;div class=&quot;ap-resource-kpi&quot;&gt;&lt;span&gt;Vật liệu cần 30 ngày tới&lt;/span&gt;&lt;strong&gt;2.840 tấn&lt;/strong&gt;&lt;small&gt;Cát, đá, ống BTCT, xi măng&lt;/small&gt;&lt;/div&gt;&lt;div class=&quot;ap-resource-kpi&quot;&gt;&lt;span&gt;Chi phí kế hoạch lũy kế&lt;/span&gt;&lt;strong&gt;8,72 tỷ&lt;/strong&gt;&lt;small&gt;Đến ngày 31/10/2026&lt;/small&gt;&lt;/div&gt;&lt;/div&gt;
+          &lt;div class=&quot;ap-charts-grid&quot;&gt;
+            &lt;div class=&quot;ap-chart-panel&quot;&gt;&lt;div class=&quot;ap-chart-head&quot;&gt;&lt;div&gt;&lt;h3&gt;Nhu cầu vật liệu theo thời gian&lt;/h3&gt;&lt;p id=&quot;ap-material-sub&quot;&gt;Khối lượng dự kiến theo tuần&lt;/p&gt;&lt;/div&gt;&lt;span class=&quot;ap-status&quot;&gt;4 vật liệu chính&lt;/span&gt;&lt;/div&gt;
+              &lt;svg class=&quot;ap-chart-svg&quot; viewBox=&quot;0 0 420 210&quot; role=&quot;img&quot; aria-label=&quot;Biểu đồ nhu cầu vật liệu theo tuần&quot;&gt;&lt;line class=&quot;axis&quot; x1=&quot;45&quot; y1=&quot;175&quot; x2=&quot;405&quot; y2=&quot;175&quot;/&gt;&lt;line class=&quot;axis&quot; x1=&quot;45&quot; y1=&quot;20&quot; x2=&quot;45&quot; y2=&quot;175&quot;/&gt;&lt;g class=&quot;grid&quot;&gt;&lt;line x1=&quot;45&quot; y1=&quot;135&quot; x2=&quot;405&quot; y2=&quot;135&quot;/&gt;&lt;line x1=&quot;45&quot; y1=&quot;95&quot; x2=&quot;405&quot; y2=&quot;95&quot;/&gt;&lt;line x1=&quot;45&quot; y1=&quot;55&quot; x2=&quot;405&quot; y2=&quot;55&quot;/&gt;&lt;/g&gt;&lt;g fill=&quot;var(--apms-material)&quot;&gt;&lt;rect x=&quot;58&quot; y=&quot;117&quot; width=&quot;22&quot; height=&quot;58&quot;/&gt;&lt;rect x=&quot;101&quot; y=&quot;93&quot; width=&quot;22&quot; height=&quot;82&quot;/&gt;&lt;rect x=&quot;144&quot; y=&quot;68&quot; width=&quot;22&quot; height=&quot;107&quot;/&gt;&lt;rect x=&quot;187&quot; y=&quot;52&quot; width=&quot;22&quot; height=&quot;123&quot;/&gt;&lt;rect x=&quot;230&quot; y=&quot;76&quot; width=&quot;22&quot; height=&quot;99&quot;/&gt;&lt;rect x=&quot;273&quot; y=&quot;103&quot; width=&quot;22&quot; height=&quot;72&quot;/&gt;&lt;rect x=&quot;316&quot; y=&quot;124&quot; width=&quot;22&quot; height=&quot;51&quot;/&gt;&lt;rect x=&quot;359&quot; y=&quot;145&quot; width=&quot;22&quot; height=&quot;30&quot;/&gt;&lt;/g&gt;&lt;polyline fill=&quot;none&quot; stroke=&quot;var(--apms-warning)&quot; stroke-width=&quot;3&quot; points=&quot;69,147 112,128 155,115 198,101 241,112 284,131 327,146 370,158&quot;/&gt;&lt;text x=&quot;9&quot; y=&quot;58&quot;&gt;1.200 t&lt;/text&gt;&lt;text x=&quot;17&quot; y=&quot;98&quot;&gt;800 t&lt;/text&gt;&lt;text x=&quot;17&quot; y=&quot;138&quot;&gt;400 t&lt;/text&gt;&lt;text x=&quot;57&quot; y=&quot;193&quot;&gt;W35&lt;/text&gt;&lt;text x=&quot;143&quot; y=&quot;193&quot;&gt;W37&lt;/text&gt;&lt;text x=&quot;229&quot; y=&quot;193&quot;&gt;W39&lt;/text&gt;&lt;text x=&quot;315&quot; y=&quot;193&quot;&gt;W41&lt;/text&gt;&lt;/svg&gt;
+              &lt;div class=&quot;ap-legend&quot;&gt;&lt;span&gt;&lt;i style=&quot;background:var(--apms-material)&quot;&gt;&lt;/i&gt;Cát, đá và vật liệu đắp&lt;/span&gt;&lt;span&gt;&lt;i style=&quot;background:var(--apms-warning)&quot;&gt;&lt;/i&gt;Ống cống BTCT&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
+            &lt;div class=&quot;ap-chart-panel&quot;&gt;&lt;div class=&quot;ap-chart-head&quot;&gt;&lt;div&gt;&lt;h3&gt;Biểu đồ huy động nhân lực&lt;/h3&gt;&lt;p&gt;Tổng số người và cơ cấu nhóm nghề&lt;/p&gt;&lt;/div&gt;&lt;span class=&quot;ap-status&quot;&gt;Giới hạn 36 người&lt;/span&gt;&lt;/div&gt;
+              &lt;svg class=&quot;ap-chart-svg&quot; viewBox=&quot;0 0 420 210&quot; role=&quot;img&quot; aria-label=&quot;Biểu đồ huy động nhân lực&quot;&gt;&lt;line class=&quot;axis&quot; x1=&quot;45&quot; y1=&quot;175&quot; x2=&quot;405&quot; y2=&quot;175&quot;/&gt;&lt;line class=&quot;axis&quot; x1=&quot;45&quot; y1=&quot;20&quot; x2=&quot;45&quot; y2=&quot;175&quot;/&gt;&lt;line x1=&quot;45&quot; y1=&quot;57&quot; x2=&quot;405&quot; y2=&quot;57&quot; stroke=&quot;var(--apms-danger)&quot; stroke-dasharray=&quot;5 4&quot;/&gt;&lt;text x=&quot;302&quot; y=&quot;50&quot;&gt;Giới hạn 36&lt;/text&gt;&lt;g fill=&quot;var(--apms-labor)&quot;&gt;&lt;rect x=&quot;58&quot; y=&quot;132&quot; width=&quot;24&quot; height=&quot;43&quot;/&gt;&lt;rect x=&quot;101&quot; y=&quot;108&quot; width=&quot;24&quot; height=&quot;67&quot;/&gt;&lt;rect x=&quot;144&quot; y=&quot;80&quot; width=&quot;24&quot; height=&quot;95&quot;/&gt;&lt;rect x=&quot;187&quot; y=&quot;44&quot; width=&quot;24&quot; height=&quot;131&quot;/&gt;&lt;rect x=&quot;230&quot; y=&quot;36&quot; width=&quot;24&quot; height=&quot;139&quot;/&gt;&lt;rect x=&quot;273&quot; y=&quot;68&quot; width=&quot;24&quot; height=&quot;107&quot;/&gt;&lt;rect x=&quot;316&quot; y=&quot;101&quot; width=&quot;24&quot; height=&quot;74&quot;/&gt;&lt;rect x=&quot;359&quot; y=&quot;137&quot; width=&quot;24&quot; height=&quot;38&quot;/&gt;&lt;/g&gt;&lt;text x=&quot;236&quot; y=&quot;29&quot;&gt;42&lt;/text&gt;&lt;text x=&quot;59&quot; y=&quot;193&quot;&gt;W35&lt;/text&gt;&lt;text x=&quot;145&quot; y=&quot;193&quot;&gt;W37&lt;/text&gt;&lt;text x=&quot;231&quot; y=&quot;193&quot;&gt;W39&lt;/text&gt;&lt;text x=&quot;317&quot; y=&quot;193&quot;&gt;W41&lt;/text&gt;&lt;/svg&gt;
+              &lt;div class=&quot;ap-legend&quot;&gt;&lt;span&gt;&lt;i style=&quot;background:var(--apms-labor)&quot;&gt;&lt;/i&gt;Tổng nhân lực&lt;/span&gt;&lt;span&gt;&lt;i style=&quot;background:var(--apms-danger)&quot;&gt;&lt;/i&gt;Ngưỡng huy động&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
+            &lt;div class=&quot;ap-chart-panel&quot;&gt;&lt;div class=&quot;ap-chart-head&quot;&gt;&lt;div&gt;&lt;h3&gt;Nhu cầu máy thi công&lt;/h3&gt;&lt;p&gt;Ca máy bình quân theo ngày làm việc&lt;/p&gt;&lt;/div&gt;&lt;span class=&quot;ap-status&quot;&gt;5 nhóm máy&lt;/span&gt;&lt;/div&gt;
+              &lt;svg class=&quot;ap-chart-svg&quot; viewBox=&quot;0 0 420 210&quot; role=&quot;img&quot; aria-label=&quot;Biểu đồ nhu cầu máy thi công&quot;&gt;&lt;line class=&quot;axis&quot; x1=&quot;45&quot; y1=&quot;175&quot; x2=&quot;405&quot; y2=&quot;175&quot;/&gt;&lt;line class=&quot;axis&quot; x1=&quot;45&quot; y1=&quot;20&quot; x2=&quot;45&quot; y2=&quot;175&quot;/&gt;&lt;g class=&quot;grid&quot;&gt;&lt;line x1=&quot;45&quot; y1=&quot;135&quot; x2=&quot;405&quot; y2=&quot;135&quot;/&gt;&lt;line x1=&quot;45&quot; y1=&quot;95&quot; x2=&quot;405&quot; y2=&quot;95&quot;/&gt;&lt;line x1=&quot;45&quot; y1=&quot;55&quot; x2=&quot;405&quot; y2=&quot;55&quot;/&gt;&lt;/g&gt;&lt;path d=&quot;M55 146 L100 112 L145 70 L190 58 L235 86 L280 103 L325 128 L380 151&quot; fill=&quot;none&quot; stroke=&quot;var(--apms-machine)&quot; stroke-width=&quot;3&quot;/&gt;&lt;g fill=&quot;var(--apms-machine)&quot;&gt;&lt;circle cx=&quot;55&quot; cy=&quot;146&quot; r=&quot;4&quot;/&gt;&lt;circle cx=&quot;100&quot; cy=&quot;112&quot; r=&quot;4&quot;/&gt;&lt;circle cx=&quot;145&quot; cy=&quot;70&quot; r=&quot;4&quot;/&gt;&lt;circle cx=&quot;190&quot; cy=&quot;58&quot; r=&quot;4&quot;/&gt;&lt;circle cx=&quot;235&quot; cy=&quot;86&quot; r=&quot;4&quot;/&gt;&lt;circle cx=&quot;280&quot; cy=&quot;103&quot; r=&quot;4&quot;/&gt;&lt;circle cx=&quot;325&quot; cy=&quot;128&quot; r=&quot;4&quot;/&gt;&lt;circle cx=&quot;380&quot; cy=&quot;151&quot; r=&quot;4&quot;/&gt;&lt;/g&gt;&lt;text x=&quot;176&quot; y=&quot;49&quot;&gt;9,4 ca/ngày&lt;/text&gt;&lt;text x=&quot;52&quot; y=&quot;193&quot;&gt;W35&lt;/text&gt;&lt;text x=&quot;141&quot; y=&quot;193&quot;&gt;W37&lt;/text&gt;&lt;text x=&quot;230&quot; y=&quot;193&quot;&gt;W39&lt;/text&gt;&lt;text x=&quot;320&quot; y=&quot;193&quot;&gt;W41&lt;/text&gt;&lt;/svg&gt;
+              &lt;div class=&quot;ap-legend&quot;&gt;&lt;span&gt;&lt;i style=&quot;background:var(--apms-machine)&quot;&gt;&lt;/i&gt;Tổng ca máy&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
+            &lt;div class=&quot;ap-chart-panel&quot;&gt;&lt;div class=&quot;ap-chart-head&quot;&gt;&lt;div&gt;&lt;h3&gt;Dòng chi phí kế hoạch&lt;/h3&gt;&lt;p&gt;Chi phí kỳ và giá trị lũy kế&lt;/p&gt;&lt;/div&gt;&lt;span class=&quot;ap-status&quot;&gt;Đơn vị: tỷ đồng&lt;/span&gt;&lt;/div&gt;
+              &lt;svg class=&quot;ap-chart-svg&quot; viewBox=&quot;0 0 420 210&quot; role=&quot;img&quot; aria-label=&quot;Biểu đồ dòng chi phí kế hoạch&quot;&gt;&lt;line class=&quot;axis&quot; x1=&quot;45&quot; y1=&quot;175&quot; x2=&quot;405&quot; y2=&quot;175&quot;/&gt;&lt;line class=&quot;axis&quot; x1=&quot;45&quot; y1=&quot;20&quot; x2=&quot;45&quot; y2=&quot;175&quot;/&gt;&lt;g fill=&quot;var(--apms-cost)&quot; opacity=&quot;.55&quot;&gt;&lt;rect x=&quot;58&quot; y=&quot;151&quot; width=&quot;22&quot; height=&quot;24&quot;/&gt;&lt;rect x=&quot;101&quot; y=&quot;139&quot; width=&quot;22&quot; height=&quot;36&quot;/&gt;&lt;rect x=&quot;144&quot; y=&quot;123&quot; width=&quot;22&quot; height=&quot;52&quot;/&gt;&lt;rect x=&quot;187&quot; y=&quot;105&quot; width=&quot;22&quot; height=&quot;70&quot;/&gt;&lt;rect x=&quot;230&quot; y=&quot;112&quot; width=&quot;22&quot; height=&quot;63&quot;/&gt;&lt;rect x=&quot;273&quot; y=&quot;129&quot; width=&quot;22&quot; height=&quot;46&quot;/&gt;&lt;rect x=&quot;316&quot; y=&quot;143&quot; width=&quot;22&quot; height=&quot;32&quot;/&gt;&lt;rect x=&quot;359&quot; y=&quot;156&quot; width=&quot;22&quot; height=&quot;19&quot;/&gt;&lt;/g&gt;&lt;path d=&quot;M69 160 L112 145 L155 124 L198 96 L241 70 L284 51 L327 38 L370 30&quot; fill=&quot;none&quot; stroke=&quot;var(--apms-cost)&quot; stroke-width=&quot;3&quot;/&gt;&lt;text x=&quot;340&quot; y=&quot;22&quot;&gt;8,72&lt;/text&gt;&lt;text x=&quot;57&quot; y=&quot;193&quot;&gt;W35&lt;/text&gt;&lt;text x=&quot;143&quot; y=&quot;193&quot;&gt;W37&lt;/text&gt;&lt;text x=&quot;229&quot; y=&quot;193&quot;&gt;W39&lt;/text&gt;&lt;text x=&quot;315&quot; y=&quot;193&quot;&gt;W41&lt;/text&gt;&lt;/svg&gt;
+              &lt;div class=&quot;ap-legend&quot;&gt;&lt;span&gt;&lt;i style=&quot;background:var(--apms-cost);opacity:.55&quot;&gt;&lt;/i&gt;Chi phí kỳ&lt;/span&gt;&lt;span&gt;&lt;i style=&quot;background:var(--apms-cost)&quot;&gt;&lt;/i&gt;Chi phí lũy kế&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/section&gt;
+    &lt;/main&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;script&gt;
+(() =&gt; {
+  const root = document.getElementById('alpha-pms-mockup');
+  const titles = { estimate:'Quản lý dự toán', schedule:'Quản lý tiến độ', gantt:'Biểu đồ Gantt', resources:'Biểu đồ nguồn lực và chi phí' };
+  root.querySelectorAll('[data-screen]').forEach(button =&gt; {
+    button.addEventListener('click', () =&gt; {
+      const screen = button.dataset.screen;
+      root.querySelectorAll('[data-screen]').forEach(b =&gt; b.setAttribute('aria-selected', String(b === button)));
+      root.querySelectorAll('[data-screen-panel]').forEach(panel =&gt; panel.classList.toggle('active', panel.dataset.screenPanel === screen));
+      root.querySelector('#ap-screen-title').textContent = titles[screen];
+    });
+  });
+  root.querySelectorAll('tr[data-row]').forEach(row =&gt; row.addEventListener('click', () =&gt; {
+    row.closest('tbody').querySelectorAll('tr').forEach(r =&gt; r.classList.remove('selected'));
+    row.classList.add('selected');
+  }));
+  const period = root.querySelector('#ap-period');
+  period.addEventListener('change', () =&gt; {
+    root.querySelector('#ap-material-sub').textContent = period.value === 'month' ? 'Khối lượng dự kiến tổng hợp theo tháng' : 'Khối lượng dự kiến theo tuần';
+  });
+})();
+&lt;/script&gt;
+
+
+&lt;style id=&quot;codex-visualization-document-scrollbar&quot;&gt;html,body{scrollbar-width:none!important}html::-webkit-scrollbar,body::-webkit-scrollbar{display:none!important}&lt;/style&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handleLeave = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+<script>(() => {
+  const frame = document.getElementById("codex-visualization");
+  if (!(frame instanceof HTMLIFrameElement)) {
+    return;
+  }
+  let viewportHeight = globalThis.innerHeight;
+
+  const channel = new MessageChannel();
+  channel.port1.addEventListener("message", (event) => {
+    const data = event.data;
+    if (typeof data !== "object" || data == null) {
+      return;
+    }
+    if (data.type === "height") {
+      const height = data.height;
+      if (
+        typeof height === "number" &&
+        Number.isFinite(height) &&
+        height >= 0 &&
+        height <= 10_000
+      ) {
+        frame.style.height = Math.ceil(height) + "px";
+      }
+      return;
+    }
+    if (data.type === "scroll-to") {
+      const top = data.top;
+      if (
+        typeof top === "number" &&
+        Number.isFinite(top) &&
+        top >= 0 &&
+        globalThis.navigator.userActivation?.isActive === true
+      ) {
+        globalThis.scrollTo({
+          top: Math.ceil(
+            globalThis.scrollY + frame.getBoundingClientRect().top + top,
+          ),
+        });
+      }
+      return;
+    }
+    if (data.type === "open-external") {
+      const rawHref = data.href;
+      if (typeof rawHref !== "string") {
+        return;
+      }
+      let href;
+      try {
+        const url = new URL(rawHref, document.baseURI);
+        if (url.protocol !== "https:") {
+          return;
+        }
+        href = url.href;
+      } catch {
+        return;
+      }
+      if (globalThis.navigator.userActivation?.isActive === true) {
+        const anchor = document.createElement("a");
+        anchor.href = href;
+        anchor.rel = "noopener noreferrer";
+        anchor.target = "_blank";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      }
+      return;
+    }
+    if (data.type === "follow-up") {
+      const prompt = data.prompt;
+      if (
+        typeof prompt !== "string" ||
+        globalThis.navigator.userActivation?.isActive !== true
+      ) {
+        return;
+      }
+      const title = data.title;
+      globalThis.prompt(typeof title === "string" ? title : prompt, prompt);
+    }
+  });
+  channel.port1.start();
+  const srcdoc = frame.dataset.srcdoc;
+  if (srcdoc == null) {
+    return;
+  }
+  globalThis.addEventListener("resize", () => {
+    const height = Number.parseFloat(frame.style.height);
+    if (!Number.isFinite(height) || height <= viewportHeight) {
+      frame.style.removeProperty("height");
+    }
+    viewportHeight = globalThis.innerHeight;
+    channel.port1.postMessage({ type: "measure" });
+  });
+  frame.addEventListener(
+    "load",
+    () => {
+      frame.contentWindow?.postMessage(
+        { type: "codex-visualization-initialize" },
+        "*",
+        [channel.port2],
+      );
+    },
+    { once: true },
+  );
+  frame.srcdoc = srcdoc;
+  delete frame.dataset.srcdoc;
+})();
+</script>
+</body>
+</html>

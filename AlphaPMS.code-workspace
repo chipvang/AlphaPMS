@@ -1,0 +1,26 @@
+{
+  "folders": [
+    {
+      "name": "AlphaPMS Code",
+      "path": "."
+    },
+    {
+      "name": "AlphaPMS Docs",
+      "path": "../Docs"
+    }
+  ],
+  "settings": {
+    "files.encoding": "utf8",
+    "files.eol": "\n",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2,
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/.next": true,
+      "**/dist": true,
+      "**/.vinext": true
+    }
+  }
+}
+
