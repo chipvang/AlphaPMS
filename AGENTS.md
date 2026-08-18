@@ -11,6 +11,5 @@ Trước khi phân tích, thiết kế hoặc sửa mã nguồn trong workspace 
 
 Thư mục chính thức:
 
-- Mã nguồn: `D:\GoogleDrive\A.Projects\AlphaPMS\Code`
-- Tài liệu: `D:\GoogleDrive\A.Projects\AlphaPMS\Docs`
-
+- Mã nguồn: `D:\A VinAlpha\AlphaPMS\Code`
+- Tài liệu: `D:\A VinAlpha\AlphaPMS\Docs`

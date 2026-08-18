@@ -5,13 +5,13 @@
 Toàn bộ mã nguồn làm việc đặt tại:
 
 ```text
-D:\GoogleDrive\A.Projects\AlphaPMS\Code
+D:\A VinAlpha\AlphaPMS\Code
 ```
 
 Tài liệu đặc tả đặt tại:
 
 ```text
-D:\GoogleDrive\A.Projects\AlphaPMS\Docs
+D:\A VinAlpha\AlphaPMS\Docs
 ```
 
 Mở file `AlphaPMS.code-workspace` bằng VS Code để xem đồng thời hai thư mục `Code` và `Docs`.
@@ -80,4 +80,3 @@ pnpm build
 - Nếu đang sửa một file thủ công, báo cho Codex biết file và phần đang sửa.
 - Trước khi Codex sửa, yêu cầu kiểm tra `git diff` để tránh ghi đè thay đổi thủ công.
 - Sau mỗi phần được chốt, cập nhật tài liệu trong `Docs` trước khi mở rộng nghiệp vụ.
-
