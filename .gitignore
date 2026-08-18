@@ -1,40 +1,36 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Thư mục tạm và tài liệu tham khảo chưa chốt
+/Temp/
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# Dependencies
+/Code/node_modules/
+/Code/.pnp
+/Code/.pnp.*
+/Code/.yarn/*
+!/Code/.yarn/patches
+!/Code/.yarn/plugins
+!/Code/.yarn/releases
+!/Code/.yarn/versions
 
-# testing
-/coverage
+# Testing
+/Code/coverage/
 
-# next.js
-/.next/
-/.vinext/
-/out/
+# Build outputs
+/Code/.next/
+/Code/.vinext/
+/Code/out/
+/Code/dist/
+/Code/.wrangler/
+/Code/outputs/
+/Code/work/
 
-# misc
-.DS_Store
+# Environment and secrets
+/Code/.env*
 *.pem
 
-# debug
+# Tool and operating-system files
+.DS_Store
+.vercel/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-/dist/
-/.wrangler/
-/outputs/
-/work/

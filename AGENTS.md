@@ -2,8 +2,8 @@
 
 Trước khi phân tích, thiết kế hoặc sửa mã nguồn trong workspace này:
 
-1. Đọc toàn bộ `../Docs/Readme.md`.
-2. Đọc các đặc tả liên quan trong `../Docs`.
+1. Đọc toàn bộ `Docs/Readme.md`.
+2. Đọc các đặc tả liên quan trong `Docs`.
 3. Kiểm tra thay đổi chưa hoàn tất trước khi chỉnh sửa.
 4. Không tự thay đổi kiến trúc, model gốc hoặc schema khi chưa có đặc tả được chốt.
 5. Tài liệu nghiệp vụ và giao diện viết bằng tiếng Việt; tên biến, hàm, model, API, bảng và trường dữ liệu viết bằng tiếng Anh.
