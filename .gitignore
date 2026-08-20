@@ -29,6 +29,7 @@
 
 # Tool and operating-system files
 .DS_Store
+~$*.docx
 .vercel/
 npm-debug.log*
 yarn-debug.log*

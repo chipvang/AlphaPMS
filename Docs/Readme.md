@@ -278,6 +278,7 @@ Không coi việc build thành công là đủ để xác nhận nghiệp vụ �
 - `Giao_Dien_QLTD_V1.md`: Đặc tả giao diện Quản lý tiến độ V1.
 - `Giao_Dien_DuToan_V1.md`: Đặc tả giao diện Quản lý dự toán ba khối V1.
 - `Giao_Dien_Chart_V1.md`: Đặc tả giao diện biểu đồ vật liệu và máy thi công V1.
+- `Kien_Truc_Undo_Redo_V1.md`: Kiến trúc Undo/Redo dùng chung cho các thao tác chỉnh sửa dữ liệu.
 
 Danh mục này phải được cập nhật khi tạo hoặc chốt thêm tài liệu.
 

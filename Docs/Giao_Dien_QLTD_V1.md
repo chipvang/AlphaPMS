@@ -192,6 +192,32 @@ Có thể bổ sung ở giai đoạn hoàn thiện:
 - Khối lượng thực hiện — `actual_quantity`.
 - Đơn vị — `unit_id`.
 
+### 8.1. Chỉnh sửa trực tiếp trên lưới
+
+Các cột nhập nhanh hỗ trợ inline edit theo nguyên tắc:
+
+- **Tên công việc**: bấm kép vào tên để chuyển thành ô nhập; `Enter` hoặc rời ô để xác nhận, `Escape` để hủy nội dung đang sửa.
+- **Thời lượng**: hiển thị số ngày gọn trong ô. Spinner tăng/giảm chỉ hiện khi rê chuột hoặc focus để giữ bảng sạch. Thời lượng tối thiểu là 1 ngày.
+- Khi thay đổi thời lượng, ngày bắt đầu được giữ nguyên và ngày kết thúc được tính lại theo ngày lịch: `finish_date = start_date + duration - 1` vì ngày bắt đầu được tính là ngày làm việc thứ nhất.
+- Khi thay đổi thời lượng, chiều rộng thanh Gantt của dòng được co giãn theo tỷ lệ thời lượng mới; vị trí bắt đầu giữ nguyên.
+- Nhấn `Enter` trong ô thời lượng xác nhận giá trị và kết thúc trạng thái edit ngay, không cần đưa chuột ra ngoài ô.
+- **Bắt đầu/Kết thúc**: luôn hiển thị và bắt buộc nhập theo `dd/MM/yy`. Người dùng có thể nhập trực tiếp hoặc bấm nút lịch nhỏ chỉ xuất hiện khi hover/focus.
+- Bộ chọn ngày dùng giao diện tiếng Việt do AlphaPMS quản lý, gồm tiêu đề `Tháng ... năm ...`, thứ `T2–CN`, điều hướng tháng trước/sau và nút **Hôm nay**; không phụ thuộc ngôn ngữ lịch native của trình duyệt.
+- Ngày không hợp lệ, ngày không tồn tại hoặc sai định dạng không được ghi nhận; hệ thống trả lại giá trị trước và thông báo lỗi.
+- Khi thay đổi ngày bắt đầu hoặc ngày kết thúc, hệ thống giữ nguyên đầu mốc còn lại và tính lại thời lượng theo công thức bao gồm cả hai đầu mốc: `duration = finish_date - start_date + 1`.
+- Ngày kết thúc không được trước ngày bắt đầu. Thay đổi không hợp lệ bị từ chối và giữ lại giá trị cũ.
+- Sau khi tính lại thời lượng, chiều rộng thanh Gantt của dòng được cập nhật theo cùng tỷ lệ ngày; vị trí bắt đầu của thanh Gantt giữ nguyên.
+- Không đặt spinner ngày thường trực vì làm tăng nhiễu thị giác và nguy cơ thay đổi nhầm dữ liệu.
+- Mỗi lần xác nhận sửa tên/ngày là một bước Undo/Redo; các lần tăng giảm thời lượng liên tiếp được phép gộp thành một bước.
+
+### 8.2. Mật độ hiển thị cột
+
+- Cột **Thời lượng** đủ rộng để caption hiển thị trên một dòng.
+- Cột **Tên công việc** có độ rộng mặc định và tối thiểu **300px**. Cạnh phải header có tay nắm kéo để mở rộng hoặc thu lại, nhưng không được nhỏ hơn 300px; giới hạn giao diện V1 là 900px.
+- Hai cột dữ liệu **Bắt đầu/Kết thúc** có độ rộng 88px, tăng thêm 4px so với thiết kế ngay trước đó và dùng cùng cỡ font với toàn bộ phần bảng công việc.
+- Việc điều chỉnh trên chỉ áp dụng cho vùng bảng bên trái. Vùng lịch và biểu đồ Gantt phía sau giữ nguyên kích thước để được thiết kế riêng ở bước tiếp theo.
+- Font caption bảng dùng design token chung `--table-header-font-size`, không khai báo rời theo từng cột; sau này có thể đưa token này vào cấu hình giao diện.
+
 ## 9. Cột tác vụ
 
 Cột **Tác vụ** nằm ngay sau cột WBS.
@@ -212,6 +238,51 @@ Quy tắc:
 - Xóa dòng có con phải yêu cầu xác nhận và nêu rõ phạm vi bị xóa.
 - Thay đổi thứ tự hoặc cấp WBS phải cập nhật đồng thời mã WBS và Gantt.
 
+### 9.1. Dịch lên và dịch xuống
+
+- Thao tác lên/xuống di chuyển cả dòng và toàn bộ nhánh con của dòng đó.
+- Hạng mục chỉ đổi thứ tự với hạng mục trong cùng dự án.
+- Nhóm công việc đổi thứ tự với nhóm công việc; khi đi qua ranh giới hạng mục, nhóm nhận hạng mục cha của vị trí đích.
+- Công tác đổi thứ tự với công tác; khi đi qua ranh giới nhóm, công tác nhận nhóm cha của vị trí đích.
+- Không được di chuyển bất kỳ hạng mục, nhóm hay công tác nào lên thành cấp dự án hoặc sang dự án khác.
+- Nếu không tồn tại dòng cùng loại ở hướng cần dịch, nút tương ứng bị vô hiệu hóa.
+- Sau khi dịch phải đánh lại WBS; cả việc dịch nhánh và đánh lại WBS là một bước Undo/Redo.
+
+### 9.2. Giảm cấp — dịch trái
+
+- `Công tác → Nhóm công việc`.
+- `Nhóm công việc → Hạng mục`.
+- Hạng mục không được giảm thành dự án; nút trái bị vô hiệu hóa.
+- Khi dòng có nhánh con, toàn bộ nhánh giảm đồng thời một cấp để bảo toàn quan hệ cha–con.
+- Dòng sau khi giảm cấp được đặt sau toàn bộ nhánh của cha cũ.
+
+### 9.3. Tăng cấp — dịch phải
+
+- `Hạng mục → Nhóm công việc`.
+- `Nhóm công việc → Công tác`.
+- Công tác là cấp cuối nên không được tăng tiếp; nút phải bị vô hiệu hóa.
+- Dòng được đưa vào làm con của phần tử cùng loại gần nhất đứng ngay trước và cùng cha hiện tại.
+- Nếu không có phần tử cùng loại phù hợp phía trước thì không được tăng cấp.
+- Toàn bộ nhánh tăng đồng thời một cấp. Nếu nhánh có phần tử sẽ vượt quá cấp Công tác thì thao tác bị vô hiệu hóa để không phá cấu trúc cây.
+- Tăng/giảm cấp, đổi `parent_id`, đổi loại phần tử và đánh lại WBS là một bước Undo/Redo duy nhất.
+
+### 9.4. Menu chèn dòng
+
+Khi bấm nút **Thêm công việc** trên thanh công cụ hoặc biểu tượng **＋** tại cột Tác vụ, hệ thống mở một menu nhỏ tại vị trí nút với hai lựa chọn:
+
+- **Chèn phía trên**: tạo một dòng mới cùng cấp ngay trước dòng hiện tại.
+- **Chèn phía dưới**: tạo một dòng mới cùng cấp ngay sau toàn bộ nhánh của dòng hiện tại.
+
+Quy tắc:
+
+- Dòng mới mặc định cùng loại và cùng `parent_id` với dòng hiện tại.
+- Nếu dòng hiện tại là dự án gốc, hai lựa chọn tương ứng thêm hạng mục đầu tiên hoặc hạng mục cuối cùng của dự án; không tạo dự án mới tại màn hình tiến độ.
+- Sau khi chèn, hệ thống chọn dòng mới để người dùng nhập thông tin.
+- WBS của các dòng bị ảnh hưởng phải được đánh lại tự động.
+- Toàn bộ việc chèn và đánh lại WBS là một bước Undo/Redo.
+- Menu đóng khi chọn một lệnh, bấm ra ngoài, cuộn/đổi kích thước cửa sổ hoặc nhấn `Escape`.
+- Có thể di chuyển giữa hai lựa chọn bằng phím mũi tên lên/xuống.
+
 ## 10. Biểu đồ Gantt
 
 Biểu đồ Gantt nằm bên phải bảng và đồng bộ từng dòng với cây WBS.
@@ -225,6 +296,15 @@ Lịch mặc định có ba cấp:
 3. Ngày.
 
 Việc đổi cấp lịch không đặt thành một nút riêng trên thanh công cụ mà nằm trong cửa sổ **Lọc**.
+
+Phạm vi và mật độ lịch:
+
+- Xác định ngày bắt đầu nhỏ nhất trong các dự án đang được chọn hiển thị, sau đó lùi thêm đúng ba cột để tạo khoảng hở trước thanh Gantt: `timeline_start = minimum_project_start_date - 3 × day_step`.
+- Ngày cuối cùng của lịch là ngày kết thúc lớn nhất của toàn bộ công tác thuộc các dự án đang chọn, kể cả công tác đang bị ẩn do thu gọn cây. Nếu dự án chưa có công tác, dùng ngày kết thúc dự án làm giá trị dự phòng.
+- Sau nút **Lọc** có ô spin **Cách nhau: n ngày**, giá trị nguyên tối thiểu 1. Mỗi cột lịch đại diện lần lượt 1, 2, 3... `n` ngày.
+- Giá trị mặc định là 1 ngày/cột; giới hạn giao diện V1 là 365 ngày/cột.
+- Độ rộng chuẩn của một cột thời gian là **20px**. Giá trị này là design token kỹ thuật dùng chung cho header và thân Gantt.
+- Khi đổi số ngày/cột, tháng, tuần, ngày, vị trí và chiều rộng thanh Gantt được dựng lại từ ngày thực tế; không thay đổi dữ liệu công tác.
 
 ### 10.2. Hiển thị thanh tiến độ
 
@@ -242,6 +322,11 @@ Việc đổi cấp lịch không đặt thành một nút riêng trên thanh c�
 - Chọn thanh Gantt phải chọn dòng ở bảng.
 - Thu gọn cây phải ẩn các dòng Gantt con.
 - Lọc phải tác động đồng thời lên cả bảng và Gantt.
+- Vùng bảng và vùng Gantt là hai pane riêng nhưng các dòng luôn có cùng chiều cao và thứ tự.
+- Chiều cao dòng bảng và dòng Gantt khóa cố định **35px**. Tên, nhãn nhóm và tính chất công tác dài phải cắt ngang/ellipsis, không được làm tăng chiều cao và gây lệch dòng.
+- Gantt có thanh cuộn ngang riêng; cuộn ngang lịch không làm dịch chuyển WBS và các cột dữ liệu bên trái.
+- Ngày hiện tại được tô nền mờ trên toàn bộ cột thời gian, từ header ngày đến tất cả dòng Gantt; thanh công tác vẫn hiển thị phía trên nền này.
+- Khi thay đổi danh sách dự án hoặc ngày bắt đầu nhỏ nhất, thanh cuộn Gantt tự trở về cạnh trái để ngày đầu lịch luôn nhìn thấy.
 
 ## 11. Chú giải và dòng đang chọn
 
