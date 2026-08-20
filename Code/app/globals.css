@@ -15,6 +15,7 @@
   --control-disabled: #e5eaed;
   --control-disabled-text: #94a1a8;
   --focus-ring: rgba(8, 127, 141, .2);
+  --ui-min-font-size: 10px;
   --table-header-font-size: 11px;
   --danger: #b84a4a;
   --warning: #a96812;
@@ -28,7 +29,9 @@
 html,
 body {
   margin: 0;
+  height: 100%;
   min-height: 100%;
+  overflow: hidden;
   background: var(--bg);
   color: var(--text)
 }
@@ -51,8 +54,10 @@ button {
 }
 
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   display: grid;
+  overflow: hidden;
   transition: grid-template-columns .2s ease
 }
 
@@ -305,13 +310,16 @@ button {
 
 .app-main {
   min-width: 0;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   display: flex;
-  flex-direction: column
+  flex-direction: column;
+  overflow: hidden
 }
 
 .topbar {
   height: 66px;
+  flex: 0 0 66px;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
   padding: 8px 18px;
@@ -965,7 +973,8 @@ button {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 38px
+  min-height: 38px;
+  flex: 0 0 auto
 }
 
 .gantt-step-control {
@@ -1007,16 +1016,37 @@ button {
   white-space: nowrap
 }
 
-.schedule-board {
+.schedule-board-shell {
+  display: grid;
+  grid-template-rows: 74px minmax(0, 1fr) 17px;
+  min-height: 0;
+  flex: 1 1 0
+}
+
+.schedule-board-header,
+.schedule-board-body {
   display: grid;
   grid-template-columns: var(--schedule-table-width, 750px) minmax(0, 1fr);
+  min-width: 0
+}
+
+.schedule-board-header {
+  padding-right: 15px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  overflow: hidden
+}
+
+.schedule-board-body {
   overflow-x: hidden;
   overflow-y: auto;
-  min-height: 286px;
-  flex: 1
+  scrollbar-gutter: stable;
+  min-height: 0;
+  border-right: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  background: var(--surface)
 }
 
 .schedule-table-pane {
@@ -1025,12 +1055,51 @@ button {
 
 .schedule-table-grid {
   display: grid;
-  grid-template-columns: 64px 116px var(--schedule-name-width, 300px) 94px 88px 88px;
+  grid-template-columns: 64px 116px var(--schedule-name-width, 400px) 94px 88px 88px;
   width: var(--schedule-table-width, 750px)
 }
 
 .task-name-column-header {
-  position: relative
+  position: relative;
+  display: grid !important;
+  place-items: center !important
+}
+
+.task-name-column-header>span:first-child {
+  justify-self: center
+}
+
+.outline-controls {
+  position: absolute;
+  left: 6px;
+  bottom: 4px;
+  display: inline-flex;
+  gap: 2px
+}
+
+.outline-controls button {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--ui-min-font-size);
+  font-weight: 600
+}
+
+.outline-controls button:hover {
+  border-color: var(--primary);
+  color: var(--primary-dark)
+}
+
+.outline-controls button.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-dark)
 }
 
 .column-resizer {
@@ -1064,9 +1133,6 @@ button {
 }
 
 .schedule-grid-header {
-  position: sticky;
-  top: 0;
-  z-index: 4;
   min-height: 74px;
   background: var(--surface-soft);
   border-bottom: 1px solid var(--line-strong);
@@ -1084,9 +1150,6 @@ button {
 }
 
 .gantt-calendar {
-  position: sticky;
-  top: 0;
-  z-index: 4;
   display: grid;
   grid-template-rows: 24px 22px 28px;
   height: 74px;
@@ -1096,6 +1159,25 @@ button {
   font-size: var(--table-header-font-size);
   font-weight: 600;
   white-space: nowrap
+}
+
+.gantt-header-pane {
+  min-width: 0;
+  overflow: hidden;
+  border-left: 1px solid var(--line-strong)
+}
+
+.gantt-header-scroll {
+  width: 100%;
+  height: 74px;
+  overflow: hidden
+}
+
+.gantt-calendar-empty {
+  place-items: center;
+  width: 100%;
+  color: var(--muted);
+  font-weight: 500
 }
 
 .calendar-month,
@@ -1117,7 +1199,7 @@ button {
 
 .calendar-days span {
   flex: 0 0 auto;
-  font-size: 9px
+  font-size: var(--ui-min-font-size)
 }
 
 .calendar-month span,
@@ -1142,7 +1224,64 @@ button {
   width: 100%;
   height: 100%;
   overflow-x: auto;
-  overflow-y: hidden
+  overflow-y: hidden;
+  scrollbar-width: none
+}
+
+.gantt-horizontal-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0
+}
+
+.gantt-scrollbar-row {
+  display: grid;
+  grid-template-columns: var(--schedule-table-width, 750px) minmax(0, 1fr);
+  min-width: 0;
+  height: 17px;
+  padding-right: 17px
+}
+
+.gantt-scrollbar-spacer {
+  border-right: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  border-radius: 0 0 0 8px;
+  background: var(--surface-soft)
+}
+
+.gantt-scrollbar-dock {
+  min-width: 0;
+  height: 17px;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0 0 8px 0;
+  background: var(--surface-soft);
+  scrollbar-color: var(--line-strong) var(--surface-soft);
+  scrollbar-width: auto
+}
+
+.gantt-scrollbar-dock::-webkit-scrollbar {
+  height: 16px
+}
+
+.gantt-scrollbar-dock::-webkit-scrollbar-track {
+  background: var(--surface-soft)
+}
+
+.gantt-scrollbar-dock::-webkit-scrollbar-thumb {
+  border: 3px solid var(--surface-soft);
+  border-radius: 8px;
+  background: var(--line-strong)
+}
+
+.gantt-scrollbar-dock::-webkit-scrollbar-thumb:hover {
+  background: var(--muted)
+}
+
+.gantt-scrollbar-content {
+  height: 1px
 }
 
 .gantt-content {
@@ -1304,7 +1443,20 @@ button {
 
 .duration-cell>span {
   color: var(--muted);
-  font-size: 9px
+  font-size: var(--ui-min-font-size)
+}
+
+.summary-value {
+  justify-content: center;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums
+}
+
+.summary-value>span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: inherit
 }
 
 .date-cell {
@@ -1355,7 +1507,7 @@ button {
   border-radius: 3px;
   background: transparent;
   color: var(--primary-dark);
-  font-size: 9px
+  font-size: var(--ui-min-font-size)
 }
 
 .inline-date-editor:hover .inline-date-button,
@@ -1419,7 +1571,7 @@ button {
 .vi-calendar-weekdays {
   padding: 7px 7px 3px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--ui-min-font-size);
   font-weight: 600;
   text-align: center
 }
@@ -1476,14 +1628,14 @@ button {
 }
 
 .row-actions {
-  gap: 2px;
+  gap: 1px;
   justify-content: center;
   white-space: nowrap
 }
 
 .row-actions button,
 .tree-toggle {
-  width: 16px;
+  width: 15px;
   height: 22px;
   display: inline-grid;
   place-items: center;
@@ -1522,7 +1674,7 @@ button {
   border-radius: 8px;
   background: #eef1f3;
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--ui-min-font-size);
   font-weight: 400
 }
 
@@ -1543,6 +1695,87 @@ button {
   box-shadow: inset 0 0 0 1px rgba(5, 91, 102, .17)
 }
 
+.summary-bar {
+  --summary-height: 14px;
+  --summary-body-height: 10px;
+  --summary-color: #aeb3b8;
+  --summary-progress: #6f767c;
+  position: absolute;
+  z-index: 2;
+  top: 17px;
+  height: var(--summary-body-height);
+  min-width: 8px;
+  overflow: visible;
+  border-top: 1px solid var(--summary-color);
+  border-bottom: 1px solid var(--summary-color);
+  background: var(--summary-color)
+}
+
+.summary-bar::before,
+.summary-bar::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: -1px;
+  width: 0;
+  height: 0;
+  border-left: calc(var(--summary-height) / 2) solid transparent;
+  border-right: calc(var(--summary-height) / 2) solid transparent;
+  border-top: var(--summary-height) solid var(--summary-color)
+}
+
+.summary-bar::before {
+  left: calc(var(--summary-height) / -2)
+}
+
+.summary-bar::after {
+  right: calc(var(--summary-height) / -2)
+}
+
+.summary-workItem {
+  --summary-height: 13px;
+  --summary-body-height: 9px
+}
+
+.summary-group {
+  --summary-height: 12px;
+  --summary-body-height: 8px
+}
+
+.summary-progress-line {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  top: 50%;
+  height: 2px;
+  max-width: 100%;
+  transform: translateY(-50%);
+  background: var(--summary-progress);
+  pointer-events: none
+}
+
+.summary-start-label,
+.summary-finish-label {
+  position: absolute;
+  bottom: calc(100% + 3px);
+  color: #5c646a;
+  font-size: var(--ui-min-font-size);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums
+}
+
+.summary-start-label {
+  left: 0;
+  transform: translateX(-25%)
+}
+
+.summary-finish-label {
+  right: 0;
+  transform: translateX(25%)
+}
+
 .gantt-bar i {
   position: absolute;
   inset: 0 auto 0 0;
@@ -1554,7 +1787,7 @@ button {
   z-index: 1;
   display: block;
   color: #fff;
-  font-size: 9px;
+  font-size: var(--ui-min-font-size);
   line-height: 17px;
   text-align: center
 }
@@ -1591,7 +1824,8 @@ button {
   padding: 5px 10px;
   border: 1px solid var(--line);
   border-radius: 7px;
-  background: var(--surface)
+  background: var(--surface);
+  flex: 0 0 auto
 }
 
 .schedule-legend span {
@@ -1626,12 +1860,62 @@ button {
   font-weight: 600
 }
 
+.task-detail-controls {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 4px
+}
+
+.task-detail-controls button,
+.schedule-detail-collapsed button {
+  min-height: 23px;
+  padding: 0 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--ui-min-font-size)
+}
+
+.task-detail-controls button:hover,
+.schedule-detail-collapsed button:hover,
+.task-detail-controls button.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-dark)
+}
+
+.schedule-detail-collapsed {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface)
+}
+
+.schedule-detail-collapsed span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+
+.schedule-detail-collapsed button {
+  margin-left: auto
+}
+
 .schedule-detail {
   display: grid;
   grid-template-columns: minmax(500px, 1fr) minmax(330px, .8fr);
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
+  flex: 0 0 auto;
   overflow: hidden
 }
 
@@ -1883,7 +2167,7 @@ button {
 
 .insert-menu small {
   color: var(--muted);
-  font-size: 9px
+  font-size: var(--ui-min-font-size)
 }
 
 @media(max-width:1000px) {

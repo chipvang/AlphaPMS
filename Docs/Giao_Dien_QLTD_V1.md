@@ -1,5 +1,9 @@
 # GIAO DIỆN QUẢN LÝ TIẾN ĐỘ — PHIÊN BẢN V1
 
+- **Trạng thái:** Đã chốt giao diện V1.
+- **Ngày chốt:** 20/08/2026.
+- **Phạm vi hoàn thành:** Bố cục, thao tác cây tiến độ, inline edit, Undo/Redo, lịch và thanh Gantt, vùng cuộn kiểu Excel, chú giải và các chế độ hiển thị `TaskDetail`.
+
 ## 1. Mục đích
 
 Màn hình **Quản lý tiến độ** là màn hình đầu tiên của phần mềm, tích hợp đồng thời:
@@ -37,12 +41,12 @@ Ví dụ:
 
 ## 3. Bố cục tổng thể
 
-Màn hình gồm bốn khu vực chính:
+Màn hình gồm bốn khu vực chính; từ ngày 20/08/2026 thống nhất tên kỹ thuật:
 
-1. Thanh điều hướng bên trái — `Left Sidebar`.
+1. Thanh điều hướng bên trái — `LeftSlider`.
 2. Tiêu đề và thanh tác vụ phía trên.
-3. Bảng WBS kết hợp biểu đồ Gantt ở trung tâm.
-4. Chú giải và vùng chi tiết công việc phía dưới.
+3. Bảng công việc bên trái — `TaskGrid` — kết hợp biểu đồ tiến độ bên phải — `GanttTimeline`.
+4. Chú giải và vùng chi tiết công việc phía dưới — `TaskDetail`.
 
 ## 4. Thanh điều hướng bên trái
 
@@ -177,7 +181,7 @@ Quy tắc:
 
 Thứ tự cột đề xuất:
 
-1. **WBS** — `wbs_code`.
+1. **STT** — số thứ tự hiển thị dẫn xuất.
 2. **Tác vụ**.
 3. **Tên công việc** — `name`.
 4. **Thời lượng** — `duration`.
@@ -213,7 +217,7 @@ Các cột nhập nhanh hỗ trợ inline edit theo nguyên tắc:
 ### 8.2. Mật độ hiển thị cột
 
 - Cột **Thời lượng** đủ rộng để caption hiển thị trên một dòng.
-- Cột **Tên công việc** có độ rộng mặc định và tối thiểu **300px**. Cạnh phải header có tay nắm kéo để mở rộng hoặc thu lại, nhưng không được nhỏ hơn 300px; giới hạn giao diện V1 là 900px.
+- Cột **Tên công việc** có độ rộng mặc định và tối thiểu **400px**. Cạnh phải header có tay nắm kéo để mở rộng hoặc thu lại, nhưng không được nhỏ hơn 400px; giới hạn giao diện V1 là 900px.
 - Hai cột dữ liệu **Bắt đầu/Kết thúc** có độ rộng 88px, tăng thêm 4px so với thiết kế ngay trước đó và dùng cùng cỡ font với toàn bộ phần bảng công việc.
 - Việc điều chỉnh trên chỉ áp dụng cho vùng bảng bên trái. Vùng lịch và biểu đồ Gantt phía sau giữ nguyên kích thước để được thiết kế riêng ở bước tiếp theo.
 - Font caption bảng dùng design token chung `--table-header-font-size`, không khai báo rời theo từng cột; sau này có thể đưa token này vào cấu hình giao diện.
@@ -266,22 +270,41 @@ Quy tắc:
 - Toàn bộ nhánh tăng đồng thời một cấp. Nếu nhánh có phần tử sẽ vượt quá cấp Công tác thì thao tác bị vô hiệu hóa để không phá cấu trúc cây.
 - Tăng/giảm cấp, đổi `parent_id`, đổi loại phần tử và đánh lại WBS là một bước Undo/Redo duy nhất.
 
-### 9.4. Menu chèn dòng
+### 9.4. Chèn dòng trực tiếp
 
-Khi bấm nút **Thêm công việc** trên thanh công cụ hoặc biểu tượng **＋** tại cột Tác vụ, hệ thống mở một menu nhỏ tại vị trí nút với hai lựa chọn:
+Không sử dụng menu trung gian. Cột **Tác vụ** có hai nút riêng:
 
-- **Chèn phía trên**: tạo một dòng mới cùng cấp ngay trước dòng hiện tại.
-- **Chèn phía dưới**: tạo một dòng mới cùng cấp ngay sau toàn bộ nhánh của dòng hiện tại.
+- **Chèn phía trên** — `InsertAbove`: tạo một dòng mới cùng cấp ngay trước dòng hiện tại.
+- **Chèn phía dưới** — `InsertBelow`: tạo một dòng mới cùng cấp ngay sau toàn bộ nhánh của dòng hiện tại.
 
 Quy tắc:
 
 - Dòng mới mặc định cùng loại và cùng `parent_id` với dòng hiện tại.
 - Nếu dòng hiện tại là dự án gốc, hai lựa chọn tương ứng thêm hạng mục đầu tiên hoặc hạng mục cuối cùng của dự án; không tạo dự án mới tại màn hình tiến độ.
 - Sau khi chèn, hệ thống chọn dòng mới để người dùng nhập thông tin.
-- WBS của các dòng bị ảnh hưởng phải được đánh lại tự động.
-- Toàn bộ việc chèn và đánh lại WBS là một bước Undo/Redo.
-- Menu đóng khi chọn một lệnh, bấm ra ngoài, cuộn/đổi kích thước cửa sổ hoặc nhấn `Escape`.
-- Có thể di chuyển giữa hai lựa chọn bằng phím mũi tên lên/xuống.
+- WBS và STT của các dòng bị ảnh hưởng phải được tính lại tự động.
+- Một lần bấm thực hiện ngay thao tác; sau khi chèn, dòng mới được chọn và ô tên tự chuyển sang trạng thái nhập liệu.
+- Toàn bộ việc chèn và tính lại dữ liệu dẫn xuất là một bước Undo/Redo.
+
+### 9.5. ID, WBS và STT
+
+- `id` là khóa nội bộ bất biến, không hiển thị và không thay đổi khi sắp xếp cây.
+- WBS là dữ liệu cấu trúc/dẫn xuất, không phải khóa chính và vẫn được giữ nội bộ để quản lý cây.
+- STT hiển thị theo quy tắc: Dự án `A, B, C...`; Hạng mục `I, II, III...`; Nhóm `I.1, I.2...`; Công tác `1, 2, 3...` trong nhóm.
+- STT tự tính lại sau thêm, xóa, dịch chuyển, tăng/giảm cấp hoặc đổi quan hệ cha–con.
+
+### 9.6. Outline 1–4
+
+Header cột **Tên công việc** có bốn nút Outline nhỏ:
+
+- `1`: chỉ Dự án.
+- `2`: Dự án và Hạng mục.
+- `3`: Dự án, Hạng mục và Nhóm.
+- `4`: toàn bộ đến Công tác.
+
+Outline chỉ đổi trạng thái hiển thị, không sửa cấu trúc dữ liệu. `TaskGrid` và `GanttTimeline` phải ẩn/hiện cùng lúc và giữ đúng thứ tự, chiều cao dòng.
+
+Nhóm bốn nút đặt ở góc trái phía dưới của header cột. Caption **Tên công việc** vẫn căn giữa theo toàn bộ chiều rộng cột và không bị nhóm nút Outline đẩy lệch.
 
 ## 10. Biểu đồ Gantt
 
@@ -300,7 +323,7 @@ Việc đổi cấp lịch không đặt thành một nút riêng trên thanh c�
 Phạm vi và mật độ lịch:
 
 - Xác định ngày bắt đầu nhỏ nhất trong các dự án đang được chọn hiển thị, sau đó lùi thêm đúng ba cột để tạo khoảng hở trước thanh Gantt: `timeline_start = minimum_project_start_date - 3 × day_step`.
-- Ngày cuối cùng của lịch là ngày kết thúc lớn nhất của toàn bộ công tác thuộc các dự án đang chọn, kể cả công tác đang bị ẩn do thu gọn cây. Nếu dự án chưa có công tác, dùng ngày kết thúc dự án làm giá trị dự phòng.
+- Ngày cuối cùng của lịch bằng ngày kết thúc lớn nhất của toàn bộ công tác thuộc các dự án đang chọn cộng `7 × day_step`, kể cả công tác đang bị ẩn do thu gọn cây hoặc Outline. Nếu dự án chưa có công tác, dùng ngày kết thúc dự án làm giá trị dự phòng rồi vẫn cộng khoảng đệm. Mục tiêu là luôn có đúng bảy cột trống sau công tác cuối.
 - Sau nút **Lọc** có ô spin **Cách nhau: n ngày**, giá trị nguyên tối thiểu 1. Mỗi cột lịch đại diện lần lượt 1, 2, 3... `n` ngày.
 - Giá trị mặc định là 1 ngày/cột; giới hạn giao diện V1 là 365 ngày/cột.
 - Độ rộng chuẩn của một cột thời gian là **20px**. Giá trị này là design token kỹ thuật dùng chung cho header và thân Gantt.
@@ -308,8 +331,14 @@ Phạm vi và mật độ lịch:
 
 ### 10.2. Hiển thị thanh tiến độ
 
-- Dự án và hạng mục sử dụng thanh tổng hợp.
-- Công tác sử dụng thanh kế hoạch có nhãn ngắn.
+- Dự án dùng `ProBar`, Hạng mục dùng `WPBar`, Nhóm dùng `WGBar`, Công tác dùng `TaskBar`.
+- Ngày bắt đầu/kết thúc của Summary Bar lấy từ ngày nhỏ nhất/lớn nhất của toàn bộ Công tác hậu duệ có ngày hợp lệ. Không lưu riêng nếu có thể tính lại.
+- Summary không có Công tác con hợp lệ thì không vẽ thanh.
+- `ProBar`, `WPBar`, `WGBar` dùng thân ngang xám, marker tam giác hướng xuống ở hai đầu; kích thước tổng lần lượt 14px, 13px và 12px, thân ngang lần lượt khoảng 10px, 9px và 8px.
+- Màu nền, màu viền và marker của Summary Bar phải giống nhau. Không dùng màu viền riêng tương phản với nền.
+- Mỗi Summary Bar có `SummaryProgressLine` cao 2px, nằm giữa thân thanh và dài theo `progress_percent` hiện có, giới hạn an toàn trong 0–100%. Màu Progress là màu xám đậm hơn màu nền Summary, không dùng màu cam.
+- Hai nhãn `StartSideLabel` và `EndSideLabel` nằm phía trên hai đầu thanh, định dạng `dd/MM`, cỡ chữ 10px và không làm tăng chiều cao dòng 35px.
+- Công tác giữ thanh chữ nhật hiện tại và khả năng gán màu theo tính chất công tác về sau.
 - Có đường ngày hiện tại.
 - Có thể hiển thị Baseline.
 - Công việc chậm tiến độ và đường găng phải phân biệt bằng màu và chú giải.
@@ -327,6 +356,16 @@ Phạm vi và mật độ lịch:
 - Gantt có thanh cuộn ngang riêng; cuộn ngang lịch không làm dịch chuyển WBS và các cột dữ liệu bên trái.
 - Ngày hiện tại được tô nền mờ trên toàn bộ cột thời gian, từ header ngày đến tất cả dòng Gantt; thanh công tác vẫn hiển thị phía trên nền này.
 - Khi thay đổi danh sách dự án hoặc ngày bắt đầu nhỏ nhất, thanh cuộn Gantt tự trở về cạnh trái để ngày đầu lịch luôn nhìn thấy.
+- Header của `TaskGrid` và `GanttTimeline` luôn khóa ở phía trên, không cuộn theo các dòng dữ liệu.
+- Toàn bộ khung ứng dụng, `LeftSlider`, TopMenu, thanh tác vụ, chú giải và `TaskDetail` không cuộn theo danh sách công tác.
+- Khi số dòng vượt chiều cao vùng làm việc, chỉ vùng chung `TaskGrid + GanttTimeline` cuộn dọc. Hai pane sử dụng cùng một giá trị cuộn để giữ dòng thẳng hàng; thanh VScroll duy nhất nằm ngoài cùng bên phải của `GanttTimeline`.
+- Gantt vẫn có thanh cuộn ngang riêng; cuộn ngang không làm dịch chuyển TaskGrid.
+- Bố cục vùng làm việc vận hành tương tự Excel: `LeftSlider`, TopMenu, thanh tác vụ, chú giải và `TaskDetail` luôn neo cố định; chỉ vùng dữ liệu chung `TaskGrid + GanttTimeline` được cuộn dọc.
+- Caption của `GanttTimeline` gồm đủ ba cấp Tháng/Tuần/Ngày khóa ở đầu vùng làm việc giống header của `TaskGrid`. Hai header là khối cố định nằm ngoài vùng cuộn dọc, không chỉ dùng hiệu ứng `sticky` bên trong vùng cuộn.
+- Thanh VScroll duy nhất đặt tại mép phải của `GanttTimeline` và điều khiển đồng thời các dòng của TaskGrid và GanttTimeline.
+- Phạm vi VScroll chỉ bắt đầu dưới header TaskGrid và caption Tháng/Tuần/Ngày, kết thúc phía trên thanh HScroll. Track VScroll không bao trùm các vùng header cố định.
+- Thanh HScroll của Gantt được tách khỏi nội dung và neo cố định ở đáy vùng Gantt, luôn hiển thị khi vùng thời gian rộng hơn khung nhìn. Thanh này cuộn đồng thời caption Timeline và thân biểu đồ nhưng không làm dịch chuyển TaskGrid.
+- Không phân trang công tác trong màn hình tiến độ vì phân trang làm mất khả năng quan sát tổng thể Gantt.
 
 ## 11. Chú giải và dòng đang chọn
 
@@ -342,6 +381,16 @@ Bên dưới bảng/Gantt hiển thị:
 
 Vùng chi tiết được giữ cố định bên dưới phần chú giải.
 
+`TaskDetail` có ba chế độ hiển thị:
+
+- **Ghim dưới** — `docked`: hiển thị đầy đủ và khóa ở đáy màn hình tiến độ.
+- **Thu nhỏ** — `collapsed`: chỉ giữ thanh tiêu đề, tên công việc đang chọn và nút mở rộng.
+- **Ẩn** — `hidden`: giải phóng toàn bộ chiều cao cho TaskGrid/GanttTimeline; người dùng có thể bật lại từ thanh chú giải.
+
+Việc đổi chế độ `TaskDetail` không làm thay đổi dữ liệu, lựa chọn dòng hoặc trạng thái Undo/Redo.
+
+### 12.1. Nội dung chi tiết
+
 Các trường cơ bản:
 
 - Tên công việc — `name`.
@@ -352,6 +401,12 @@ Các trường cơ bản:
 Khi người dùng chọn một dòng khác, vùng chi tiết cập nhật theo dòng đó.
 
 Đối với dòng dự án, hạng mục hoặc nhóm, vùng chi tiết sẽ dùng bộ trường tương ứng với loại phần tử. Chỉ dòng công tác mới hiển thị đầy đủ dữ liệu lập tiến độ và phân bổ BOQ.
+
+### 12.2. Quy tắc cỡ chữ tối thiểu
+
+- Font của caption, label và nội dung grid trong tất cả vùng giao diện không được nhỏ hơn **10px**.
+- Các đối tượng giao diện tạo mới phải dùng design token chung, mặc định `--ui-min-font-size: 10px`, thay vì hard-code 8px hoặc 9px.
+- Có thể dùng cỡ lớn hơn theo cấp nhấn mạnh; 10px chỉ là giới hạn tối thiểu.
 
 ## 13. Khối lượng dự toán đã phân bổ
 
@@ -392,7 +447,7 @@ Các nội dung đã thống nhất:
 
 - Quản lý tiến độ và Gantt gộp thành một màn hình.
 - Quản lý tiến độ là phân hệ đầu tiên.
-- Có Left Sidebar cấp ứng dụng.
+- Có `LeftSlider` cấp ứng dụng.
 - Chọn và chỉnh sửa nhiều dự án đồng thời.
 - Cây dữ liệu theo `Dự án → Hạng mục → Nhóm → Công tác`.
 - Cột tác vụ nằm ngay sau WBS.
@@ -401,6 +456,8 @@ Các nội dung đã thống nhất:
 - Lịch Gantt mặc định hiển thị Tháng/Tuần/Ngày.
 - Giữ vùng chú giải, công việc đang chọn, chi tiết công việc và khối lượng dự toán đã phân bổ.
 - Thiết kế cửa sổ Lọc chi tiết sẽ thực hiện ở bước sau.
+- TaskGrid hiển thị STT dẫn xuất, có Outline 1–4 và hai nút chèn trực tiếp.
+- GanttTimeline có ProBar/WPBar/WGBar dẫn xuất từ Công tác con và bảy cột trống sau ngày kết thúc lớn nhất.
 
 ## 17. Bản mô phỏng tham chiếu
 

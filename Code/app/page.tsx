@@ -1,6 +1,6 @@
 "use client";
 
-import { CSSProperties, FormEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useUndoRedo } from "../lib/history/useUndoRedo";
 
@@ -200,6 +200,49 @@ function recalculateScheduleWbs(items: ScheduleItem[]) {
   });
 }
 
+function toRoman(value: number) {
+  const symbols: Array<[number, string]> = [[1000, "M"], [900, "CM"], [500, "D"], [400, "CD"], [100, "C"], [90, "XC"], [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]];
+  let remaining = Math.max(1, Math.trunc(value));
+  return symbols.reduce((result, [number, symbol]) => {
+    while (remaining >= number) {
+      result += symbol;
+      remaining -= number;
+    }
+    return result;
+  }, "");
+}
+
+function toAlphabeticOrder(value: number) {
+  let remaining = Math.max(1, Math.trunc(value));
+  let result = "";
+  while (remaining > 0) {
+    remaining -= 1;
+    result = String.fromCharCode(65 + (remaining % 26)) + result;
+    remaining = Math.floor(remaining / 26);
+  }
+  return result;
+}
+
+function calculateScheduleOrder(items: ScheduleItem[]) {
+  const result = new Map<string, string>();
+  const siblingCounters = new Map<string, number>();
+  let projectIndex = 0;
+  items.forEach((item) => {
+    if (item.type === "project") {
+      projectIndex += 1;
+      result.set(item.id, toAlphabeticOrder(projectIndex));
+      return;
+    }
+    const parentKey = `${item.parentId ?? item.projectId}:${item.type}`;
+    const siblingIndex = (siblingCounters.get(parentKey) ?? 0) + 1;
+    siblingCounters.set(parentKey, siblingIndex);
+    if (item.type === "workItem") result.set(item.id, toRoman(siblingIndex));
+    else if (item.type === "group") result.set(item.id, `${result.get(item.parentId ?? "") ?? "I"}.${siblingIndex}`);
+    else result.set(item.id, String(siblingIndex));
+  });
+  return result;
+}
+
 function parseDisplayDate(value: string) {
   const match = /^(\d{2})\/(\d{2})\/(\d{2})$/.exec(value.trim());
   if (!match) return null;
@@ -261,8 +304,8 @@ function getIsoWeek(date: Date) {
   return Math.ceil((((utcDate.getTime() - yearStart.getTime()) / 86_400_000) + 1) / 7);
 }
 
-function InlineNameEditor({ value, onCommit }: { value: string; onCommit: (value: string) => void }) {
-  const [isEditing, setIsEditing] = useState(false);
+function InlineNameEditor({ value, autoEdit = false, onCommit }: { value: string; autoEdit?: boolean; onCommit: (value: string) => void }) {
+  const [isEditing, setIsEditing] = useState(autoEdit);
   const [draftValue, setDraftValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -409,25 +452,44 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
   const [selectedItemId, setSelectedItemId] = useState("ba-k95");
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-  const [insertMenu, setInsertMenu] = useState<{ targetId: string; left: number; top: number } | null>(null);
+  const [outlineLevel, setOutlineLevel] = useState(4);
+  const [autoEditItemId, setAutoEditItemId] = useState<string | null>(null);
+  const [taskDetailMode, setTaskDetailMode] = useState<"docked" | "collapsed" | "hidden">("docked");
   const [ganttDayStep, setGanttDayStep] = useState(1);
-  const [taskNameColumnWidth, setTaskNameColumnWidth] = useState(300);
+  const [taskNameColumnWidth, setTaskNameColumnWidth] = useState(400);
   const deleteDialogRef = useRef<HTMLDivElement>(null);
-  const insertMenuRef = useRef<HTMLDivElement>(null);
+  const ganttHeaderScrollRef = useRef<HTMLDivElement>(null);
   const ganttScrollRef = useRef<HTMLDivElement>(null);
+  const ganttBottomScrollRef = useRef<HTMLDivElement>(null);
   const cancelDeleteButtonRef = useRef<HTMLButtonElement>(null);
   const confirmDeleteButtonRef = useRef<HTMLButtonElement>(null);
   const visibleProjectIds = useMemo(() => new Set(projects.filter((project) => project.visible).map((project) => project.id)), [projects]);
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
+  const scheduleOrder = useMemo(() => calculateScheduleOrder(items), [items]);
+  const summaryDates = useMemo(() => {
+    const result = new Map<string, { startDate: string; finishDate: string; duration: number }>();
+    items.filter((item) => item.type !== "task").forEach((summary) => {
+      const taskDates = items
+        .filter((item) => item.type === "task" && isScheduleDescendant(item, summary.id, itemById))
+        .map((item) => ({ start: parseDisplayDate(item.startDate), finish: parseDisplayDate(item.finishDate) }))
+        .filter((dates): dates is { start: Date; finish: Date } => Boolean(dates.start && dates.finish));
+      if (!taskDates.length) return;
+      const start = new Date(Math.min(...taskDates.map((dates) => dates.start.getTime())));
+      const finish = new Date(Math.max(...taskDates.map((dates) => dates.finish.getTime())));
+      result.set(summary.id, { startDate: formatDisplayDate(start), finishDate: formatDisplayDate(finish), duration: differenceInCalendarDays(finish, start) + 1 });
+    });
+    return result;
+  }, [itemById, items]);
   const visibleItems = useMemo(() => items.filter((item) => {
     if (!visibleProjectIds.has(item.projectId)) return false;
+    if (scheduleDepth[item.type] + 1 > outlineLevel) return false;
     let parentId = item.parentId;
     while (parentId) {
       if (collapsedIds.has(parentId)) return false;
       parentId = itemById.get(parentId)?.parentId ?? null;
     }
     return true;
-  }), [collapsedIds, itemById, items, visibleProjectIds]);
+  }), [collapsedIds, itemById, items, outlineLevel, visibleProjectIds]);
   const timeline = useMemo(() => {
     const scheduleProjectStartDates = items
       .filter((item) => visibleProjectIds.has(item.projectId) && item.type === "project")
@@ -453,7 +515,8 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     const finishDate = finishCandidates.length
       ? new Date(Math.max(...finishCandidates.map((date) => date.getTime())))
       : new Date(startDate);
-    const safeFinishDate = finishDate < startDate ? new Date(startDate) : finishDate;
+    const maximumFinishDate = finishDate < startDate ? new Date(startDate) : finishDate;
+    const safeFinishDate = addCalendarDays(maximumFinishDate, 7 * ganttDayStep);
     const columnCount = Math.floor(differenceInCalendarDays(safeFinishDate, startDate) / ganttDayStep) + 1;
     const columns = Array.from({ length: columnCount }, (_, index) => addCalendarDays(startDate, index * ganttDayStep));
     const createGroups = (getKey: (date: Date) => string, getLabel: (date: Date) => string) => {
@@ -493,6 +556,8 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
 
   useEffect(() => {
     if (ganttScrollRef.current) ganttScrollRef.current.scrollLeft = 0;
+    if (ganttHeaderScrollRef.current) ganttHeaderScrollRef.current.scrollLeft = 0;
+    if (ganttBottomScrollRef.current) ganttBottomScrollRef.current.scrollLeft = 0;
   }, [timelineStartTime, visibleProjectKey]);
   const scheduleTableWidth = 450 + taskNameColumnWidth;
   const scheduleBoardStyle = {
@@ -500,6 +565,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     "--schedule-table-width": `${scheduleTableWidth}px`,
   } as CSSProperties;
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? visibleItems[0];
+  const selectedSummaryDates = selectedItem?.type === "task" ? null : summaryDates.get(selectedItem?.id ?? "");
   const deleteTarget = items.find((item) => item.id === deleteTargetId);
   const deleteChildCount = deleteTarget ? items.filter((item) => {
     let parentId = item.parentId;
@@ -696,41 +762,6 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     return () => document.removeEventListener("keydown", handleHistoryShortcut);
   }, [onNotice, scheduleHistory]);
 
-  useEffect(() => {
-    if (!insertMenu) return;
-    insertMenuRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
-    function closeInsertMenu(event: globalThis.PointerEvent) {
-      if (!insertMenuRef.current?.contains(event.target as Node)) setInsertMenu(null);
-    }
-    function handleInsertMenuKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setInsertMenu(null);
-        return;
-      }
-      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-      const buttons = Array.from(insertMenuRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? []);
-      if (!buttons.length) return;
-      event.preventDefault();
-      const currentIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
-      const direction = event.key === "ArrowDown" ? 1 : -1;
-      buttons[(currentIndex + direction + buttons.length) % buttons.length].focus();
-    }
-    function closeOnViewportChange() {
-      setInsertMenu(null);
-    }
-    document.addEventListener("pointerdown", closeInsertMenu);
-    document.addEventListener("keydown", handleInsertMenuKeyDown);
-    globalThis.addEventListener("resize", closeOnViewportChange);
-    globalThis.addEventListener("scroll", closeOnViewportChange, true);
-    return () => {
-      document.removeEventListener("pointerdown", closeInsertMenu);
-      document.removeEventListener("keydown", handleInsertMenuKeyDown);
-      globalThis.removeEventListener("resize", closeOnViewportChange);
-      globalThis.removeEventListener("scroll", closeOnViewportChange, true);
-    };
-  }, [insertMenu]);
-
   function toggleCollapse(itemId: string) {
     setCollapsedIds((current) => {
       const next = new Set(current);
@@ -749,7 +780,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
     function handlePointerMove(pointerEvent: globalThis.PointerEvent) {
-      setTaskNameColumnWidth(Math.max(300, Math.min(900, startWidth + pointerEvent.clientX - startX)));
+      setTaskNameColumnWidth(Math.max(400, Math.min(900, startWidth + pointerEvent.clientX - startX)));
     }
     function finishResize() {
       document.body.style.cursor = previousCursor;
@@ -803,23 +834,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     return true;
   }
 
-  function openInsertMenu(event: ReactMouseEvent<HTMLButtonElement>, contextItem?: ScheduleItem) {
-    event.stopPropagation();
-    const context = contextItem ?? selectedItem;
-    if (!context) {
-      onNotice("Hãy chọn một dòng trước khi chèn công việc");
-      return;
-    }
-    const rect = event.currentTarget.getBoundingClientRect();
-    setInsertMenu({
-      targetId: context.id,
-      left: Math.max(8, Math.min(rect.left, globalThis.innerWidth - 224)),
-      top: Math.min(rect.bottom + 4, globalThis.innerHeight - 112),
-    });
-  }
-
-  function insertScheduleItem(position: "before" | "after") {
-    const context = items.find((item) => item.id === insertMenu?.targetId);
+  function insertScheduleItem(context: ScheduleItem | undefined, position: "before" | "after") {
     const projectId = context?.projectId ?? projects.find((project) => project.visible)?.id;
     if (!projectId) {
       onNotice("Hãy chọn ít nhất một dự án trước khi thêm công việc");
@@ -869,7 +884,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     const insertedItem = nextItems.find((item) => item.id === newItem.id) ?? newItem;
     scheduleHistory.commit(nextItems, { description: `Chèn ${insertedItem.wbs} · ${insertedItem.name} ${position === "before" ? "phía trên" : "phía dưới"}` });
     setSelectedItemId(newItem.id);
-    setInsertMenu(null);
+    setAutoEditItemId(newItem.id);
     onNotice(`Đã chèn “${insertedItem.name}” ${position === "before" ? "phía trên" : "phía dưới"} dòng hiện tại`);
   }
 
@@ -910,7 +925,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
 
   return <section className="schedule-screen">
     <div className="schedule-toolbar">
-      <button className="button primary" onClick={(event) => openInsertMenu(event)}>＋ Thêm công việc</button>
+      <button className="button primary" onClick={() => insertScheduleItem(selectedItem, "after")}>＋ Thêm công việc</button>
       <button className="button secondary history-button" disabled={!scheduleHistory.canUndo} title={scheduleHistory.undoDescription ? `Hoàn tác: ${scheduleHistory.undoDescription} (Ctrl+Z)` : "Không có thao tác để hoàn tác"} onClick={() => { const description = scheduleHistory.undoDescription; scheduleHistory.undo(); onNotice(`Đã hoàn tác: ${description}`); }}>↶ Hoàn tác</button>
       <button className="button secondary history-button" disabled={!scheduleHistory.canRedo} title={scheduleHistory.redoDescription ? `Làm lại: ${scheduleHistory.redoDescription} (Ctrl+Y)` : "Không có thao tác để làm lại"} onClick={() => { const description = scheduleHistory.redoDescription; scheduleHistory.redo(); onNotice(`Đã làm lại: ${description}`); }}>↷ Làm lại</button>
       <button className="button" onClick={() => onNotice("Phân bổ BOQ sẽ mở cho công tác đang chọn")}>🔗 Phân bổ BOQ</button>
@@ -921,27 +936,41 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       <span className="schedule-context">{visibleProjectIds.size} dự án · {visibleItems.length} dòng · Có quyền chỉnh sửa</span>
     </div>
 
-    <div className="schedule-board" style={scheduleBoardStyle}>
-      <div className="schedule-table-pane">
+    <div className="schedule-board-shell" style={scheduleBoardStyle}>
+      <div className="schedule-board-header">
         <div className="schedule-table-grid schedule-grid-header">
-          <div>WBS</div><div>Tác vụ</div><div className="task-name-column-header">Tên công việc<button type="button" className="column-resizer" aria-label="Kéo để thay đổi độ rộng cột Tên công việc" title={`Độ rộng hiện tại: ${Math.round(taskNameColumnWidth)}px`} onPointerDown={startTaskNameColumnResize} /></div><div>Thời lượng</div><div>Bắt đầu</div><div>Kết thúc</div>
+          <div>STT</div><div>Tác vụ</div><div className="task-name-column-header"><span>Tên công việc</span><span className="outline-controls" aria-label="Cấp Outline">{[1, 2, 3, 4].map((level) => <button key={level} type="button" className={outlineLevel === level ? "active" : ""} aria-pressed={outlineLevel === level} title={`Outline ${level}`} onClick={() => setOutlineLevel(level)}>{level}</button>)}</span><button type="button" className="column-resizer" aria-label="Kéo để thay đổi độ rộng cột Tên công việc" title={`Độ rộng hiện tại: ${Math.round(taskNameColumnWidth)}px`} onPointerDown={startTaskNameColumnResize} /></div><div>Thời lượng</div><div>Bắt đầu</div><div>Kết thúc</div>
         </div>
+        <div className="gantt-header-pane">
+          <div ref={ganttHeaderScrollRef} className="gantt-header-scroll">
+            {timeline ? <div className="gantt-calendar" style={{ width: timeline.width }}>
+              <div className="calendar-month">{timeline.monthGroups.map((group) => <span key={group.key} style={{ width: group.count * ganttColumnWidth }}>{group.label}</span>)}</div>
+              <div className="calendar-week">{timeline.weekGroups.map((group) => <span key={group.key} style={{ width: group.count * ganttColumnWidth }}>{group.label}</span>)}</div>
+              <div className="calendar-days">{timeline.columns.map((date, index) => <span key={date.toISOString()} className={index === timeline.todayColumnIndex ? "today" : ""} style={{ width: ganttColumnWidth }} title={`${formatDisplayDate(date)} · ${ganttDayStep} ngày`}>{String(date.getDate()).padStart(2, "0")}</span>)}</div>
+            </div> : <div className="gantt-calendar gantt-calendar-empty">Chọn dự án để tạo lịch Gantt.</div>}
+          </div>
+        </div>
+      </div>
+
+      <div className="schedule-board-body">
+      <div className="schedule-table-pane">
         <div className="schedule-rows">
           {visibleItems.map((item) => {
             const isSelected = item.id === selectedItem?.id;
             const expandable = hasChildren(item.id);
+            const derivedDates = item.type === "task" ? null : summaryDates.get(item.id);
             return <div key={item.id} className={`schedule-table-grid schedule-row row-${item.type} ${isSelected ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => setSelectedItemId(item.id)} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) setSelectedItemId(item.id); }}>
-              <div className="wbs-cell">{item.wbs}</div>
+              <div className="wbs-cell" title={`WBS: ${item.wbs}`}>{scheduleOrder.get(item.id)}</div>
               <div className="row-actions">
-                <button title="Dịch lên" disabled={item.type === "project" || !findVerticalTarget(item, "up")} onClick={() => moveScheduleItem(item, "up")}>↑</button><button title="Dịch xuống" disabled={item.type === "project" || !findVerticalTarget(item, "down")} onClick={() => moveScheduleItem(item, "down")}>↓</button><button title="Giảm cấp" disabled={!canOutdent(item)} onClick={() => outdentScheduleItem(item)}>←</button><button title="Tăng cấp" disabled={!canIndent(item)} onClick={() => indentScheduleItem(item)}>→</button><button title="Chèn dòng" onClick={(event) => openInsertMenu(event, item)}>＋</button><button title="Xóa" disabled={item.type === "project"} onClick={() => deleteItem(item)}>⌫</button>
+                <button title="Dịch lên" disabled={item.type === "project" || !findVerticalTarget(item, "up")} onClick={() => moveScheduleItem(item, "up")}>↑</button><button title="Dịch xuống" disabled={item.type === "project" || !findVerticalTarget(item, "down")} onClick={() => moveScheduleItem(item, "down")}>↓</button><button title="Giảm cấp" disabled={!canOutdent(item)} onClick={() => outdentScheduleItem(item)}>←</button><button title="Tăng cấp" disabled={!canIndent(item)} onClick={() => indentScheduleItem(item)}>→</button><button aria-label="Chèn phía trên" title="Chèn phía trên" onClick={() => insertScheduleItem(item, "before")}>↥</button><button aria-label="Chèn phía dưới" title="Chèn phía dưới" onClick={() => insertScheduleItem(item, "after")}>↧</button><button title="Xóa" disabled={item.type === "project"} onClick={() => deleteItem(item)}>⌫</button>
               </div>
               <div className="task-name" style={{ paddingLeft: `${10 + scheduleDepth[item.type] * 18}px` }}>
                 {expandable ? <button className="tree-toggle" onClick={(event) => { event.stopPropagation(); toggleCollapse(item.id); }}>{collapsedIds.has(item.id) ? "›" : "⌄"}</button> : <span className="tree-spacer" />}
-                <InlineNameEditor value={item.name} onCommit={(name) => { setSelectedItemId(item.id); scheduleHistory.commit((current) => current.map((currentItem) => currentItem.id === item.id ? { ...currentItem, name } : currentItem), { description: `Đổi tên ${item.wbs} thành “${name}”` }); onNotice(`Đã đổi tên ${item.wbs}`); }} />{item.nature && <small>{item.nature}</small>}
+                <InlineNameEditor value={item.name} autoEdit={autoEditItemId === item.id} onCommit={(name) => { setAutoEditItemId(null); setSelectedItemId(item.id); scheduleHistory.commit((current) => current.map((currentItem) => currentItem.id === item.id ? { ...currentItem, name } : currentItem), { description: `Đổi tên ${item.wbs} thành “${name}”` }); onNotice(`Đã đổi tên ${item.wbs}`); }} />{item.nature && <small>{item.nature}</small>}
               </div>
-              <div className="duration-cell"><input aria-label={`Thời lượng ${item.name}`} type="number" min="1" value={item.duration} onFocus={() => setSelectedItemId(item.id)} onChange={(event) => updateDuration(item, Number(event.target.value))} onKeyDown={(event) => { event.stopPropagation(); if (event.key === "Enter") event.currentTarget.blur(); }} /><span>ngày</span></div>
+              {item.type === "task" ? <><div className="duration-cell"><input aria-label={`Thời lượng ${item.name}`} type="number" min="1" value={item.duration} onFocus={() => setSelectedItemId(item.id)} onChange={(event) => updateDuration(item, Number(event.target.value))} onKeyDown={(event) => { event.stopPropagation(); if (event.key === "Enter") event.currentTarget.blur(); }} /><span>ngày</span></div>
               <div className="date-cell"><InlineDateEditor key={`${item.id}-start-${item.startDate}`} label={`Ngày bắt đầu ${item.name}`} value={item.startDate} onCommit={(value) => { setSelectedItemId(item.id); return updateScheduleDate(item, "startDate", value); }} onInvalid={() => onNotice("Ngày bắt đầu phải đúng định dạng dd/MM/yy")} /></div>
-              <div className="date-cell"><InlineDateEditor key={`${item.id}-finish-${item.finishDate}`} label={`Ngày kết thúc ${item.name}`} value={item.finishDate} onCommit={(value) => { setSelectedItemId(item.id); return updateScheduleDate(item, "finishDate", value); }} onInvalid={() => onNotice("Ngày kết thúc phải đúng định dạng dd/MM/yy")} /></div>
+              <div className="date-cell"><InlineDateEditor key={`${item.id}-finish-${item.finishDate}`} label={`Ngày kết thúc ${item.name}`} value={item.finishDate} onCommit={(value) => { setSelectedItemId(item.id); return updateScheduleDate(item, "finishDate", value); }} onInvalid={() => onNotice("Ngày kết thúc phải đúng định dạng dd/MM/yy")} /></div></> : <><div className="duration-cell summary-value"><span>{derivedDates?.duration ?? "—"} {derivedDates ? "ngày" : ""}</span></div><div className="date-cell summary-value"><span>{derivedDates?.startDate ?? "—"}</span></div><div className="date-cell summary-value"><span>{derivedDates?.finishDate ?? "—"}</span></div></>}
             </div>;
           })}
           {!visibleItems.length && <div className="schedule-empty">Chưa chọn dự án nào trong “Dự án hiển thị”.</div>}
@@ -949,25 +978,27 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       </div>
 
       <div className="gantt-pane">
-        <div ref={ganttScrollRef} className="gantt-horizontal-scroll">
+        <div ref={ganttScrollRef} className="gantt-horizontal-scroll" onScroll={(event) => {
+          const dock = ganttBottomScrollRef.current;
+          if (dock && Math.abs(dock.scrollLeft - event.currentTarget.scrollLeft) > 1) dock.scrollLeft = event.currentTarget.scrollLeft;
+          const header = ganttHeaderScrollRef.current;
+          if (header && Math.abs(header.scrollLeft - event.currentTarget.scrollLeft) > 1) header.scrollLeft = event.currentTarget.scrollLeft;
+        }}>
           {timeline ? <div className="gantt-content" style={{ width: timeline.width }}>
-            <div className="gantt-calendar">
-              <div className="calendar-month">{timeline.monthGroups.map((group) => <span key={group.key} style={{ width: group.count * ganttColumnWidth }}>{group.label}</span>)}</div>
-              <div className="calendar-week">{timeline.weekGroups.map((group) => <span key={group.key} style={{ width: group.count * ganttColumnWidth }}>{group.label}</span>)}</div>
-              <div className="calendar-days">{timeline.columns.map((date, index) => <span key={date.toISOString()} className={index === timeline.todayColumnIndex ? "today" : ""} style={{ width: ganttColumnWidth }} title={`${formatDisplayDate(date)} · ${ganttDayStep} ngày`}>{String(date.getDate()).padStart(2, "0")}</span>)}</div>
-            </div>
             <div className="gantt-rows">
               {visibleItems.map((item) => {
-                const itemStartDate = parseDisplayDate(item.startDate) ?? timeline.startDate;
-                const itemFinishDate = parseDisplayDate(item.finishDate) ?? itemStartDate;
-                const barLeft = Math.max(0, differenceInCalendarDays(itemStartDate, timeline.startDate) / ganttDayStep * ganttColumnWidth);
-                const durationDays = Math.max(1, differenceInCalendarDays(itemFinishDate, itemStartDate) + 1);
+                const derivedDates = item.type === "task" ? null : summaryDates.get(item.id);
+                const itemStartDate = parseDisplayDate(derivedDates?.startDate ?? item.startDate);
+                const itemFinishDate = parseDisplayDate(derivedDates?.finishDate ?? item.finishDate);
+                const hasValidBar = Boolean(itemStartDate && itemFinishDate && (item.type === "task" || derivedDates));
+                const safeStartDate = itemStartDate ?? timeline.startDate;
+                const safeFinishDate = itemFinishDate ?? safeStartDate;
+                const barLeft = Math.max(0, differenceInCalendarDays(safeStartDate, timeline.startDate) / ganttDayStep * ganttColumnWidth);
+                const durationDays = Math.max(1, differenceInCalendarDays(safeFinishDate, safeStartDate) + 1);
                 const barWidth = Math.max(4, durationDays / ganttDayStep * ganttColumnWidth);
                 return <div key={item.id} className={`gantt-row row-${item.type} ${item.id === selectedItem?.id ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => setSelectedItemId(item.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setSelectedItemId(item.id); }}>
                   {timeline.todayColumnIndex >= 0 && <span className="today-column" style={{ left: timeline.todayColumnIndex * ganttColumnWidth, width: ganttColumnWidth }} />}
-                  <span className={`gantt-bar ${item.critical ? "critical" : ""} ${item.delayed ? "delayed" : ""}`} style={{ left: barLeft, width: barWidth }} title={`${item.name}: ${item.startDate}–${item.finishDate} · ${item.progress}%`}>
-                    <i style={{ width: `${item.progress}%` }} />{item.type === "task" && <b>{item.progress}%</b>}
-                  </span>
+                  {hasValidBar && (item.type === "task" ? <span className={`gantt-bar task-bar ${item.critical ? "critical" : ""} ${item.delayed ? "delayed" : ""}`} style={{ left: barLeft, width: barWidth }} title={`${item.name}: ${item.startDate}–${item.finishDate} · ${item.progress}%`}><i style={{ width: `${Math.max(0, Math.min(100, item.progress || 0))}%` }} /><b>{item.progress}%</b></span> : <span className={`summary-bar summary-${item.type}`} style={{ left: barLeft, width: barWidth }} title={`${item.name}: ${derivedDates?.startDate}–${derivedDates?.finishDate} · ${item.progress || 0}%`}><span className="summary-start-label">{derivedDates?.startDate.slice(0, 5)}</span><span className="summary-finish-label">{derivedDates?.finishDate.slice(0, 5)}</span><i className="summary-progress-line" style={{ width: `${Math.max(0, Math.min(100, item.progress || 0))}%` }} /></span>)}
                 </div>;
               })}
             </div>
@@ -975,17 +1006,29 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
         </div>
       </div>
     </div>
+    <div className="gantt-scrollbar-row" aria-hidden="true">
+      <div className="gantt-scrollbar-spacer" />
+      <div ref={ganttBottomScrollRef} className="gantt-scrollbar-dock" onScroll={(event) => {
+        const timelineScroll = ganttScrollRef.current;
+        if (timelineScroll && Math.abs(timelineScroll.scrollLeft - event.currentTarget.scrollLeft) > 1) timelineScroll.scrollLeft = event.currentTarget.scrollLeft;
+        const header = ganttHeaderScrollRef.current;
+        if (header && Math.abs(header.scrollLeft - event.currentTarget.scrollLeft) > 1) header.scrollLeft = event.currentTarget.scrollLeft;
+      }}><div className="gantt-scrollbar-content" style={{ width: timeline?.width ?? 0 }} /></div>
+    </div>
+    </div>
 
-    <div className="schedule-legend"><span><i className="legend-current" />Kế hoạch hiện tại</span><span><i className="legend-baseline" />Baseline</span><span><i className="legend-delayed" />Chậm tiến độ</span><span><i className="legend-critical" />Đường găng</span><strong>Đang chọn: {selectedItem?.name ?? "Chưa có"}</strong></div>
+    <div className="schedule-legend"><span><i className="legend-current" />Kế hoạch hiện tại</span><span><i className="legend-baseline" />Baseline</span><span><i className="legend-delayed" />Chậm tiến độ</span><span><i className="legend-critical" />Đường găng</span><strong>Đang chọn: {selectedItem?.name ?? "Chưa có"}</strong><div className="task-detail-controls" aria-label="Chế độ vùng chi tiết"><button type="button" className={taskDetailMode === "docked" ? "active" : ""} aria-pressed={taskDetailMode === "docked"} title="Ghim vùng chi tiết ở đáy" onClick={() => setTaskDetailMode("docked")}>Ghim dưới</button><button type="button" className={taskDetailMode === "collapsed" ? "active" : ""} aria-pressed={taskDetailMode === "collapsed"} title="Thu nhỏ vùng chi tiết" onClick={() => setTaskDetailMode("collapsed")}>Thu nhỏ</button><button type="button" className={taskDetailMode === "hidden" ? "active" : ""} aria-pressed={taskDetailMode === "hidden"} title="Ẩn vùng chi tiết" onClick={() => setTaskDetailMode("hidden")}>Ẩn</button></div></div>
 
-    {selectedItem && <div className="schedule-detail">
+    {selectedItem && taskDetailMode === "collapsed" && <div className="schedule-detail-collapsed"><strong>Chi tiết công việc</strong><span>{selectedItem.name}</span><button type="button" onClick={() => setTaskDetailMode("docked")}>Mở rộng</button></div>}
+
+    {selectedItem && taskDetailMode === "docked" && <div className="schedule-detail">
       <div className="task-detail-form">
         <h3>Chi tiết công việc</h3>
         <div className="task-detail-grid">
           <label><span>Tên công việc</span><input value={selectedItem.name} onChange={(event) => updateSelected({ name: event.target.value })} /></label>
-          <label><span>Thời lượng</span><input type="number" min="1" value={selectedItem.duration} onChange={(event) => updateDuration(selectedItem, Number(event.target.value))} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} /></label>
-          <label><span>Bắt đầu</span><input value={selectedItem.startDate} onChange={(event) => updateSelected({ startDate: event.target.value })} /></label>
-          <label><span>Kết thúc</span><input value={selectedItem.finishDate} onChange={(event) => updateSelected({ finishDate: event.target.value })} /></label>
+          <label><span>Thời lượng</span><input type="number" min="1" disabled={selectedItem.type !== "task"} value={selectedSummaryDates?.duration ?? selectedItem.duration} onChange={(event) => updateDuration(selectedItem, Number(event.target.value))} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} /></label>
+          <label><span>Bắt đầu</span><input disabled={selectedItem.type !== "task"} value={selectedSummaryDates?.startDate ?? selectedItem.startDate} onChange={(event) => updateSelected({ startDate: event.target.value })} /></label>
+          <label><span>Kết thúc</span><input disabled={selectedItem.type !== "task"} value={selectedSummaryDates?.finishDate ?? selectedItem.finishDate} onChange={(event) => updateSelected({ finishDate: event.target.value })} /></label>
         </div>
       </div>
       <div className="boq-allocation">
@@ -1015,11 +1058,6 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       </div>
     </div>}
 
-    {insertMenu && <div ref={insertMenuRef} className="insert-menu" style={{ left: insertMenu.left, top: insertMenu.top }} role="menu" aria-label="Vị trí chèn dòng">
-      <div className="insert-menu-caption">Chèn dòng mới</div>
-      <button type="button" role="menuitem" onClick={() => insertScheduleItem("before")}><span>↑</span><div><strong>Chèn phía trên</strong><small>{itemById.get(insertMenu.targetId)?.type === "project" ? "Thêm hạng mục đầu tiên" : "Cùng cấp với dòng hiện tại"}</small></div></button>
-      <button type="button" role="menuitem" onClick={() => insertScheduleItem("after")}><span>↓</span><div><strong>Chèn phía dưới</strong><small>{itemById.get(insertMenu.targetId)?.type === "project" ? "Thêm hạng mục cuối cùng" : "Cùng cấp với dòng hiện tại"}</small></div></button>
-    </div>}
   </section>;
 }
 
