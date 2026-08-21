@@ -3,6 +3,7 @@
 import { CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useUndoRedo } from "../lib/history/useUndoRedo";
+import { DependencyType, formatDependencyLabel, propagateDependencySchedule, TaskDependency, validateTaskDependency } from "../lib/schedule/dependencies";
 
 type ProjectStatus = "Đang thực hiện" | "Chuẩn bị" | "Tạm dừng" | "Hoàn thành";
 
@@ -108,15 +109,19 @@ const blankProject: Omit<Project, "id" | "updatedAt"> = {
 };
 
 const menuItems = [
+  ["projects", "◫", "Danh sách dự án"],
   ["schedule", "▤", "Quản lý tiến độ"],
   ["estimate", "▦", "Quản lý dự toán"],
   ["resources", "⌁", "Nguồn lực & chi phí"],
-  ["projects", "□", "Quản lý dự án"],
   ["catalogs", "▱", "Danh mục dùng chung"],
 ] as const;
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(value);
+}
+
+function formatOptionalNumber(value?: number) {
+  return value == null ? "—" : new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(value);
 }
 
 function todayLabel() {
@@ -147,6 +152,12 @@ type ScheduleItem = {
   nature?: string;
   critical?: boolean;
   delayed?: boolean;
+  unit?: string;
+  quantity?: number;
+  machineShiftCoefficient?: number;
+  machineCount?: number;
+  managedLabor?: number;
+  permanentLabor?: number;
   allocation?: {
     code: string;
     name: string;
@@ -154,6 +165,24 @@ type ScheduleItem = {
     total: number;
     unit: string;
   };
+};
+
+type TaskGridColumnGroup = "basic" | "progress" | "estimate" | "resource";
+type TaskGridColumnGroupVisibility = Record<TaskGridColumnGroup, boolean>;
+
+type ScheduleState = {
+  items: ScheduleItem[];
+  dependencies: TaskDependency[];
+};
+
+type DependencyDraft = Pick<TaskDependency, "id" | "predecessorTaskId" | "dependencyType" | "lag">;
+
+type DependencyDragState = {
+  sourceTaskId: string;
+  sourcePoint: { x: number; y: number };
+  pointerPosition: { x: number; y: number };
+  initialPointerPosition: { x: number; y: number };
+  hasExceededThreshold: boolean;
 };
 
 const initialScheduleItems: ScheduleItem[] = [
@@ -168,6 +197,12 @@ const initialScheduleItems: ScheduleItem[] = [
   { id: "sx-pile", projectId: "prj-song-xanh", parentId: "sx-bridge", type: "group", wbs: "B.1.1", name: "Nhóm thi công móng trụ", duration: 96, startDate: "10/08/26", finishDate: "13/11/26", progress: 24, ganttLeft: 10, ganttWidth: 39, nature: "Cọc" },
   { id: "sx-pile-task", projectId: "prj-song-xanh", parentId: "sx-pile", type: "task", wbs: "B.1.1.1", name: "Khoan cọc nhồi trụ T1", duration: 31, startDate: "22/08/26", finishDate: "21/09/26", progress: 35, ganttLeft: 15, ganttWidth: 25, nature: "Cọc", allocation: { code: "AG.31121", name: "Khoan tạo lỗ cọc nhồi", allocated: 186, total: 420, unit: "m" } },
 ];
+
+const initialTaskDependencies: TaskDependency[] = [
+  { id: "dep-ba-k95-base", projectId: "prj-bac-an", predecessorTaskId: "ba-k95", successorTaskId: "ba-base-task", dependencyType: "FS", lag: 0 },
+];
+
+const initialScheduleState: ScheduleState = { items: initialScheduleItems, dependencies: initialTaskDependencies };
 
 const scheduleDepth: Record<ScheduleItemType, number> = { project: 0, workItem: 1, group: 2, task: 3 };
 const scheduleTypeByDepth: ScheduleItemType[] = ["project", "workItem", "group", "task"];
@@ -447,25 +482,40 @@ function InlineDateEditor({ label, value, onCommit, onInvalid }: { label: string
 }
 
 function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (message: string) => void }) {
-  const scheduleHistory = useUndoRedo(initialScheduleItems, 100);
-  const items = scheduleHistory.value;
+  const scheduleHistory = useUndoRedo(initialScheduleState, 100);
+  const { items, dependencies } = scheduleHistory.value;
   const [selectedItemId, setSelectedItemId] = useState("ba-k95");
+  const [selectedDependencyId, setSelectedDependencyId] = useState<string | null>(null);
+  const [dependencyEditorTaskId, setDependencyEditorTaskId] = useState<string | null>(null);
+  const [dependencyDrafts, setDependencyDrafts] = useState<DependencyDraft[]>([]);
+  const [dependencySearch, setDependencySearch] = useState("");
+  const [dependencyEditorError, setDependencyEditorError] = useState("");
+  const [dependencyDrag, setDependencyDrag] = useState<DependencyDragState | null>(null);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [outlineLevel, setOutlineLevel] = useState(4);
   const [autoEditItemId, setAutoEditItemId] = useState<string | null>(null);
   const [taskDetailMode, setTaskDetailMode] = useState<"docked" | "collapsed" | "hidden">("docked");
   const [ganttDayStep, setGanttDayStep] = useState(1);
-  const [taskNameColumnWidth, setTaskNameColumnWidth] = useState(400);
+  const [taskNameColumnWidth, setTaskNameColumnWidth] = useState(415);
+  const [columnGroupVisibility, setColumnGroupVisibility] = useState<TaskGridColumnGroupVisibility>({ basic: true, progress: true, estimate: false, resource: false });
   const deleteDialogRef = useRef<HTMLDivElement>(null);
+  const taskGridHeaderScrollRef = useRef<HTMLDivElement>(null);
+  const taskGridBodyScrollRef = useRef<HTMLDivElement>(null);
   const ganttHeaderScrollRef = useRef<HTMLDivElement>(null);
   const ganttScrollRef = useRef<HTMLDivElement>(null);
   const ganttBottomScrollRef = useRef<HTMLDivElement>(null);
+  const ganttContentRef = useRef<HTMLDivElement>(null);
   const cancelDeleteButtonRef = useRef<HTMLButtonElement>(null);
   const confirmDeleteButtonRef = useRef<HTMLButtonElement>(null);
   const visibleProjectIds = useMemo(() => new Set(projects.filter((project) => project.visible).map((project) => project.id)), [projects]);
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const scheduleOrder = useMemo(() => calculateScheduleOrder(items), [items]);
+  const incomingDependencies = useMemo(() => {
+    const result = new Map<string, TaskDependency[]>();
+    dependencies.forEach((dependency) => result.set(dependency.successorTaskId, [...(result.get(dependency.successorTaskId) ?? []), dependency]));
+    return result;
+  }, [dependencies]);
   const summaryDates = useMemo(() => {
     const result = new Map<string, { startDate: string; finishDate: string; duration: number }>();
     items.filter((item) => item.type !== "task").forEach((summary) => {
@@ -559,12 +609,30 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     if (ganttHeaderScrollRef.current) ganttHeaderScrollRef.current.scrollLeft = 0;
     if (ganttBottomScrollRef.current) ganttBottomScrollRef.current.scrollLeft = 0;
   }, [timelineStartTime, visibleProjectKey]);
-  const scheduleTableWidth = 450 + taskNameColumnWidth;
+  const basicColumnWidths = [50, 116, taskNameColumnWidth];
+  const scheduleColumnWidths = [60, 70, 70, 50, 96];
+  const estimateColumnWidths = [60, 86, 100];
+  const resourceColumnWidths = [50, 50, 60, 60];
+  const visibleColumnWidths = [
+    ...basicColumnWidths,
+    ...(columnGroupVisibility.progress ? scheduleColumnWidths : []),
+    ...(columnGroupVisibility.estimate ? estimateColumnWidths : []),
+    ...(columnGroupVisibility.resource ? resourceColumnWidths : []),
+  ];
+  const scheduleTableWidth = visibleColumnWidths.reduce((sum, width) => sum + width, 0);
+  const scheduleGridTemplate = visibleColumnWidths.map((width) => `${width}px`).join(" ");
   const scheduleBoardStyle = {
     "--schedule-name-width": `${taskNameColumnWidth}px`,
     "--schedule-table-width": `${scheduleTableWidth}px`,
+    "--schedule-grid-template": scheduleGridTemplate,
   } as CSSProperties;
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? visibleItems[0];
+  const dependencyEditorTask = items.find((item) => item.id === dependencyEditorTaskId);
+  const dependencyCandidates = items.filter((item) => {
+    if (!dependencyEditorTask || item.type !== "task" || item.projectId !== dependencyEditorTask.projectId || item.id === dependencyEditorTask.id) return false;
+    const keyword = dependencySearch.trim().toLocaleLowerCase("vi");
+    return !keyword || `${scheduleOrder.get(item.id) ?? ""} ${item.name}`.toLocaleLowerCase("vi").includes(keyword);
+  });
   const selectedSummaryDates = selectedItem?.type === "task" ? null : summaryDates.get(selectedItem?.id ?? "");
   const deleteTarget = items.find((item) => item.id === deleteTargetId);
   const deleteChildCount = deleteTarget ? items.filter((item) => {
@@ -576,6 +644,127 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     return false;
   }).length : 0;
   const hasChildren = (itemId: string) => items.some((item) => item.parentId === itemId);
+  const areAllColumnGroupsVisible = Object.values(columnGroupVisibility).every(Boolean);
+
+  function toggleColumnGroup(group: Exclude<TaskGridColumnGroup, "basic">) {
+    setColumnGroupVisibility((current) => ({ ...current, [group]: !current[group] }));
+  }
+
+  function syncTaskGridHorizontalScroll(scrollLeft: number, source: "header" | "body") {
+    const target = source === "header" ? taskGridBodyScrollRef.current : taskGridHeaderScrollRef.current;
+    if (target && Math.abs(target.scrollLeft - scrollLeft) > 1) target.scrollLeft = scrollLeft;
+  }
+
+  function commitItems(next: ScheduleItem[] | ((current: ScheduleItem[]) => ScheduleItem[]), options: { description: string; mergeKey?: string }) {
+    scheduleHistory.commit((current) => ({
+      ...current,
+      items: typeof next === "function" ? next(current.items) : next,
+    }), options);
+  }
+
+  function createDependencyId() {
+    return globalThis.crypto?.randomUUID?.() ?? `dependency-${Date.now()}`;
+  }
+
+  function commitDependency(candidate: TaskDependency, description: string) {
+    const validation = validateTaskDependency(candidate, dependencies, items);
+    if (!validation.isValid) {
+      onNotice(validation.message);
+      return false;
+    }
+    scheduleHistory.commit((current) => {
+      const nextDependencies = [...current.dependencies, candidate];
+      return {
+        dependencies: nextDependencies,
+        items: propagateDependencySchedule(current.items, nextDependencies, [candidate.predecessorTaskId]),
+      };
+    }, { description });
+    setSelectedDependencyId(candidate.id);
+    return true;
+  }
+
+  function openDependencyEditor(task: ScheduleItem, dependencyId?: string) {
+    if (task.type !== "task") {
+      onNotice("Chỉ công tác thực hiện mới có quan hệ trước–sau");
+      return;
+    }
+    setDependencyEditorTaskId(task.id);
+    setDependencyDrafts((incomingDependencies.get(task.id) ?? []).map((dependency) => ({
+      id: dependency.id,
+      predecessorTaskId: dependency.predecessorTaskId,
+      dependencyType: dependency.dependencyType,
+      lag: dependency.lag,
+    })));
+    setDependencySearch("");
+    setDependencyEditorError("");
+    setSelectedDependencyId(dependencyId ?? null);
+  }
+
+  function addDependencyDraft() {
+    const successor = items.find((item) => item.id === dependencyEditorTaskId);
+    if (!successor) return;
+    const usedIds = new Set(dependencyDrafts.map((draft) => draft.predecessorTaskId));
+    const predecessor = items.find((item) => item.type === "task" && item.projectId === successor.projectId && item.id !== successor.id && !usedIds.has(item.id));
+    if (!predecessor) {
+      setDependencyEditorError("Không còn công tác trước hợp lệ để thêm");
+      return;
+    }
+    setDependencyDrafts((current) => [...current, { id: createDependencyId(), predecessorTaskId: predecessor.id, dependencyType: "FS", lag: 0 }]);
+    setDependencyEditorError("");
+  }
+
+  function saveDependencyEditor() {
+    const successor = items.find((item) => item.id === dependencyEditorTaskId);
+    if (!successor) return;
+    const untouchedDependencies = dependencies.filter((dependency) => dependency.successorTaskId !== successor.id);
+    const nextIncoming: TaskDependency[] = [];
+    for (const draft of dependencyDrafts) {
+      const candidate: TaskDependency = {
+        ...draft,
+        projectId: successor.projectId,
+        successorTaskId: successor.id,
+        lag: Math.trunc(Number(draft.lag) || 0),
+      };
+      const validation = validateTaskDependency(candidate, [...untouchedDependencies, ...nextIncoming], items);
+      if (!validation.isValid) {
+        setDependencyEditorError(validation.message);
+        return;
+      }
+      nextIncoming.push(candidate);
+    }
+    scheduleHistory.commit((current) => ({
+      dependencies: [...current.dependencies.filter((dependency) => dependency.successorTaskId !== successor.id), ...nextIncoming],
+      items: propagateDependencySchedule(
+        current.items,
+        [...current.dependencies.filter((dependency) => dependency.successorTaskId !== successor.id), ...nextIncoming],
+        nextIncoming.length ? nextIncoming.map((dependency) => dependency.predecessorTaskId) : [successor.id],
+      ),
+    }), { description: `Cập nhật quan hệ công việc của ${successor.name}` });
+    setDependencyEditorTaskId(null);
+    setDependencyEditorError("");
+    onNotice(`Đã cập nhật quan hệ công việc của ${successor.name}`);
+  }
+
+  function deleteSelectedDependency() {
+    const dependency = dependencies.find((item) => item.id === selectedDependencyId);
+    if (!dependency) return;
+    const predecessor = itemById.get(dependency.predecessorTaskId);
+    const successor = itemById.get(dependency.successorTaskId);
+    scheduleHistory.commit((current) => {
+      const nextDependencies = current.dependencies.filter((item) => item.id !== dependency.id);
+      const hasRemainingPredecessor = nextDependencies.some((item) => item.successorTaskId === dependency.successorTaskId);
+      return {
+        dependencies: nextDependencies,
+        items: hasRemainingPredecessor
+          ? propagateDependencySchedule(current.items, nextDependencies, [dependency.predecessorTaskId])
+          : current.items,
+      };
+    }, {
+      description: `Xóa quan hệ ${dependency.dependencyType} giữa ${predecessor?.name ?? "công tác trước"} và ${successor?.name ?? "công tác sau"}`,
+    });
+    setSelectedDependencyId(null);
+    onNotice("Đã xóa quan hệ công việc");
+  }
 
   function getBranchRange(targetId: string) {
     const startIndex = items.findIndex((item) => item.id === targetId);
@@ -649,7 +838,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       ...movingBranch,
       ...remainingItems.slice(insertIndex),
     ]);
-    scheduleHistory.commit(nextItems, { description: `Dịch ${target.wbs} ${direction === "up" ? "lên" : "xuống"}` });
+    commitItems(nextItems, { description: `Dịch ${target.wbs} ${direction === "up" ? "lên" : "xuống"}` });
     setSelectedItemId(target.id);
     onNotice(`Đã dịch “${target.name}” ${direction === "up" ? "lên" : "xuống"}`);
   }
@@ -676,7 +865,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       ...transformedBranch,
       ...remainingItems.slice(insertIndex),
     ]);
-    scheduleHistory.commit(nextItems, { description: `Giảm cấp ${target.wbs} · ${target.name}` });
+    commitItems(nextItems, { description: `Giảm cấp ${target.wbs} · ${target.name}` });
     setSelectedItemId(target.id);
     onNotice(`Đã chuyển “${target.name}” thành ${target.type === "task" ? "Nhóm công việc" : "Hạng mục"}`);
   }
@@ -698,7 +887,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       ...transformedBranch,
       ...items.slice(targetRange.endIndex),
     ]);
-    scheduleHistory.commit(nextItems, { description: `Tăng cấp ${target.wbs} · ${target.name}` });
+    commitItems(nextItems, { description: `Tăng cấp ${target.wbs} · ${target.name}` });
     setSelectedItemId(target.id);
     onNotice(`Đã chuyển “${target.name}” thành ${target.type === "workItem" ? "Nhóm công việc" : "Công tác"}`);
   }
@@ -762,6 +951,68 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     return () => document.removeEventListener("keydown", handleHistoryShortcut);
   }, [onNotice, scheduleHistory]);
 
+  useEffect(() => {
+    function handleDependencyDelete(event: globalThis.KeyboardEvent) {
+      if (event.key !== "Delete" || !selectedDependencyId) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.matches("input, textarea, select, [contenteditable='true']")) return;
+      event.preventDefault();
+      deleteSelectedDependency();
+    }
+    document.addEventListener("keydown", handleDependencyDelete);
+    return () => document.removeEventListener("keydown", handleDependencyDelete);
+  });
+
+  useEffect(() => {
+    if (!dependencyDrag) return;
+    const sourceTaskId = dependencyDrag.sourceTaskId;
+    function handlePointerMove(event: globalThis.PointerEvent) {
+      const content = ganttContentRef.current;
+      if (!content) return;
+      const rect = content.getBoundingClientRect();
+      setDependencyDrag((current) => {
+        if (!current) return null;
+        const distance = Math.hypot(event.clientX - current.initialPointerPosition.x, event.clientY - current.initialPointerPosition.y);
+        return { ...current, pointerPosition: { x: event.clientX - rect.left, y: event.clientY - rect.top }, hasExceededThreshold: current.hasExceededThreshold || distance >= 5 };
+      });
+    }
+    function finishDrag(event: globalThis.PointerEvent) {
+      const activeDrag = dependencyDrag;
+      if (!activeDrag.hasExceededThreshold) {
+        setDependencyDrag(null);
+        return;
+      }
+      const targetElement = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-dependency-task]");
+      const successorTaskId = targetElement?.dataset.taskId;
+      if (successorTaskId) {
+        const predecessor = items.find((item) => item.id === sourceTaskId);
+        const successor = items.find((item) => item.id === successorTaskId);
+        if (predecessor && successor) {
+          const candidate: TaskDependency = { id: createDependencyId(), projectId: predecessor.projectId, predecessorTaskId: predecessor.id, successorTaskId: successor.id, dependencyType: "FS", lag: 0 };
+          if (commitDependency(candidate, `Tạo quan hệ FS giữa ${predecessor.name} và ${successor.name}`)) {
+            onNotice(`Đã tạo quan hệ FS: ${predecessor.name} → ${successor.name}`);
+          }
+        }
+      }
+      setDependencyDrag(null);
+    }
+    function cancelDrag(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") setDependencyDrag(null);
+    }
+    document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("pointerup", finishDrag, { once: true });
+    document.addEventListener("pointercancel", finishDrag, { once: true });
+    document.addEventListener("keydown", cancelDrag);
+    return () => {
+      document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerup", finishDrag);
+      document.removeEventListener("pointercancel", finishDrag);
+      document.removeEventListener("keydown", cancelDrag);
+    };
+    // Pointer move chỉ cập nhật tọa độ; listener được tạo lại khi nguồn kéo thay đổi, không theo từng pixel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dependencyDrag?.hasExceededThreshold, dependencyDrag?.sourceTaskId]);
+
   function toggleCollapse(itemId: string) {
     setCollapsedIds((current) => {
       const next = new Set(current);
@@ -780,7 +1031,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
     function handlePointerMove(pointerEvent: globalThis.PointerEvent) {
-      setTaskNameColumnWidth(Math.max(400, Math.min(900, startWidth + pointerEvent.clientX - startX)));
+      setTaskNameColumnWidth(Math.max(415, Math.min(915, startWidth + pointerEvent.clientX - startX)));
     }
     function finishResize() {
       document.body.style.cursor = previousCursor;
@@ -796,7 +1047,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
 
   function updateSelected(changes: Partial<ScheduleItem>, description?: string, mergeKey?: string) {
     if (!selectedItem) return;
-    scheduleHistory.commit(
+    commitItems(
       (current) => current.map((item) => item.id === selectedItem.id ? { ...item, ...changes } : item),
       { description: description ?? `Sửa ${selectedItem.wbs} · ${selectedItem.name}`, mergeKey: mergeKey ?? `edit-${selectedItem.id}` },
     );
@@ -808,10 +1059,10 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     const finishDate = calculateFinishDate(target.startDate, duration) ?? target.finishDate;
     const ganttWidthPerDay = target.ganttWidth / Math.max(1, target.duration);
     const ganttWidth = Math.max(1, Math.min(100 - target.ganttLeft, ganttWidthPerDay * duration));
-    scheduleHistory.commit(
-      (current) => current.map((item) => item.id === target.id ? { ...item, duration, finishDate, ganttWidth } : item),
-      { description: `Đổi thời lượng ${target.wbs} thành ${duration} ngày`, mergeKey: `duration-${target.id}` },
-    );
+    scheduleHistory.commit((current) => {
+      const changedItems = current.items.map((item) => item.id === target.id ? { ...item, duration, finishDate, ganttWidth } : item);
+      return { ...current, items: propagateDependencySchedule(changedItems, current.dependencies, [target.id]) };
+    }, { description: `Đổi thời lượng ${target.wbs} thành ${duration} ngày`, mergeKey: `duration-${target.id}` });
     onNotice(`Đã cập nhật thời lượng và ngày kết thúc của ${target.name}`);
   }
 
@@ -826,10 +1077,10 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     const ganttWidthPerDay = target.ganttWidth / Math.max(1, target.duration);
     const ganttWidth = Math.max(1, Math.min(100 - target.ganttLeft, ganttWidthPerDay * duration));
     const changes: Partial<ScheduleItem> = { startDate, finishDate, duration, ganttWidth };
-    scheduleHistory.commit(
-      (current) => current.map((item) => item.id === target.id ? { ...item, ...changes } : item),
-      { description: `Đổi ${field === "startDate" ? "ngày bắt đầu" : "ngày kết thúc"} ${target.wbs}`, mergeKey: `date-${field}-${target.id}` },
-    );
+    scheduleHistory.commit((current) => {
+      const changedItems = current.items.map((item) => item.id === target.id ? { ...item, ...changes } : item);
+      return { ...current, items: propagateDependencySchedule(changedItems, current.dependencies, [target.id]) };
+    }, { description: `Đổi ${field === "startDate" ? "ngày bắt đầu" : "ngày kết thúc"} ${target.wbs}`, mergeKey: `date-${field}-${target.id}` });
     onNotice(`Đã cập nhật ngày, thời lượng và Gantt của ${target.name}`);
     return true;
   }
@@ -882,7 +1133,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       ...items.slice(insertIndex),
     ]);
     const insertedItem = nextItems.find((item) => item.id === newItem.id) ?? newItem;
-    scheduleHistory.commit(nextItems, { description: `Chèn ${insertedItem.wbs} · ${insertedItem.name} ${position === "before" ? "phía trên" : "phía dưới"}` });
+    commitItems(nextItems, { description: `Chèn ${insertedItem.wbs} · ${insertedItem.name} ${position === "before" ? "phía trên" : "phía dưới"}` });
     setSelectedItemId(newItem.id);
     setAutoEditItemId(newItem.id);
     onNotice(`Đã chèn “${insertedItem.name}” ${position === "before" ? "phía trên" : "phía dưới"} dòng hiện tại`);
@@ -915,7 +1166,10 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       });
     }
     scheduleHistory.commit(
-      (current) => current.filter((item) => !idsToDelete.has(item.id)),
+      (current) => ({
+        items: current.items.filter((item) => !idsToDelete.has(item.id)),
+        dependencies: current.dependencies.filter((dependency) => !idsToDelete.has(dependency.predecessorTaskId) && !idsToDelete.has(dependency.successorTaskId)),
+      }),
       { description: `Xóa ${target.wbs} · ${target.name}${idsToDelete.size > 1 ? ` và ${idsToDelete.size - 1} dòng con` : ""}` },
     );
     setSelectedItemId(target.parentId ?? visibleItems[0]?.id ?? "");
@@ -923,23 +1177,83 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     onNotice(`Đã xóa “${target.name}” khỏi dữ liệu nháp tiến độ`);
   }
 
+  function getTaskBarGeometry(taskId: string) {
+    if (!timeline) return null;
+    const rowIndex = visibleItems.findIndex((item) => item.id === taskId);
+    const task = visibleItems[rowIndex];
+    if (!task || task.type !== "task") return null;
+    const startDate = parseDisplayDate(task.startDate);
+    const finishDate = parseDisplayDate(task.finishDate);
+    if (!startDate || !finishDate) return null;
+    const left = Math.max(0, differenceInCalendarDays(startDate, timeline.startDate) / ganttDayStep * ganttColumnWidth);
+    const durationDays = Math.max(1, differenceInCalendarDays(finishDate, startDate) + 1);
+    const width = Math.max(4, durationDays / ganttDayStep * ganttColumnWidth);
+    return { left, width, y: rowIndex * 35 + 17.5 };
+  }
+
+  function startDependencyDrag(event: ReactPointerEvent<HTMLSpanElement>, task: ScheduleItem, barLeft: number, barWidth: number, rowIndex: number) {
+    event.preventDefault();
+    event.stopPropagation();
+    const sourcePoint = { x: barLeft + barWidth, y: rowIndex * 35 + 17.5 };
+    setSelectedItemId(task.id);
+    setSelectedDependencyId(null);
+    setDependencyDrag({ sourceTaskId: task.id, sourcePoint, pointerPosition: sourcePoint, initialPointerPosition: { x: event.clientX, y: event.clientY }, hasExceededThreshold: false });
+  }
+
+  function isValidDependencyTarget(target: ScheduleItem) {
+    if (!dependencyDrag || target.type !== "task") return false;
+    const source = items.find((item) => item.id === dependencyDrag.sourceTaskId);
+    if (!source) return false;
+    const candidate: TaskDependency = {
+      id: "dependency-drag-preview",
+      projectId: source.projectId,
+      predecessorTaskId: source.id,
+      successorTaskId: target.id,
+      dependencyType: "FS",
+      lag: 0,
+    };
+    return validateTaskDependency(candidate, dependencies, items).isValid;
+  }
+
   return <section className="schedule-screen">
     <div className="schedule-toolbar">
-      <button className="button primary" onClick={() => insertScheduleItem(selectedItem, "after")}>＋ Thêm công việc</button>
-      <button className="button secondary history-button" disabled={!scheduleHistory.canUndo} title={scheduleHistory.undoDescription ? `Hoàn tác: ${scheduleHistory.undoDescription} (Ctrl+Z)` : "Không có thao tác để hoàn tác"} onClick={() => { const description = scheduleHistory.undoDescription; scheduleHistory.undo(); onNotice(`Đã hoàn tác: ${description}`); }}>↶ Hoàn tác</button>
-      <button className="button secondary history-button" disabled={!scheduleHistory.canRedo} title={scheduleHistory.redoDescription ? `Làm lại: ${scheduleHistory.redoDescription} (Ctrl+Y)` : "Không có thao tác để làm lại"} onClick={() => { const description = scheduleHistory.redoDescription; scheduleHistory.redo(); onNotice(`Đã làm lại: ${description}`); }}>↷ Làm lại</button>
-      <button className="button" onClick={() => onNotice("Phân bổ BOQ sẽ mở cho công tác đang chọn")}>🔗 Phân bổ BOQ</button>
-      <button className="button" onClick={() => onNotice("Quan hệ công việc: FS, SS, FF, SF và lag/lead")}>⌘ Quan hệ công việc</button>
-      <button className="button" onClick={() => onNotice("Lịch làm việc sẽ quản lý ngày nghỉ, ca và ngoại lệ")}>▣ Lịch làm việc</button>
-      <button className="button" onClick={() => onNotice("Bộ lọc chi tiết sẽ được thiết kế ở bước tiếp theo")}>☰ Lọc</button>
-      <label className="gantt-step-control"><span>Cách nhau:</span><input type="number" min="1" max="365" value={ganttDayStep} aria-label="Số ngày trong một cột Gantt" onChange={(event) => setGanttDayStep(Math.max(1, Math.min(365, Math.trunc(Number(event.target.value) || 1))))} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} /><small>ngày</small></label>
-      <span className="schedule-context">{visibleProjectIds.size} dự án · {visibleItems.length} dòng · Có quyền chỉnh sửa</span>
+      <div className="schedule-toolbar-left">
+        <button className="button primary" onClick={() => onNotice("Nhập tiến độ từ Excel sẽ được kết nối ở bước tiếp theo")}>▣ Nhập từ Excel</button>
+        <button className="button secondary history-button" disabled={!scheduleHistory.canUndo} title={scheduleHistory.undoDescription ? `Hoàn tác: ${scheduleHistory.undoDescription} (Ctrl+Z)` : "Không có thao tác để hoàn tác"} onClick={() => { const description = scheduleHistory.undoDescription; scheduleHistory.undo(); onNotice(`Đã hoàn tác: ${description}`); }}>↶ Hoàn tác</button>
+        <button className="button secondary history-button" disabled={!scheduleHistory.canRedo} title={scheduleHistory.redoDescription ? `Làm lại: ${scheduleHistory.redoDescription} (Ctrl+Y)` : "Không có thao tác để làm lại"} onClick={() => { const description = scheduleHistory.redoDescription; scheduleHistory.redo(); onNotice(`Đã làm lại: ${description}`); }}>↷ Làm lại</button>
+        <button className="button" onClick={() => onNotice("Bộ lọc chi tiết sẽ được thiết kế ở bước tiếp theo")}>☰ Lọc</button>
+      </div>
+      <div className="schedule-toolbar-right">
+        <button className="button" onClick={() => onNotice("Lịch làm việc sẽ quản lý ngày nghỉ, ca và ngoại lệ")}>▣ Lịch làm việc</button>
+        <label className="gantt-step-control"><span>Cách nhau:</span><input type="number" min="1" max="365" value={ganttDayStep} aria-label="Số ngày trong một cột Gantt" onChange={(event) => setGanttDayStep(Math.max(1, Math.min(365, Math.trunc(Number(event.target.value) || 1))))} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} /><small>ngày</small></label>
+        <button className="button secondary" onClick={() => onNotice("Lịch sử thay đổi sẽ được kết nối sau")}>◷ Lịch sử</button>
+        <button className="button primary" onClick={() => onNotice("Đã lưu dữ liệu tiến độ nháp trên phiên làm việc")}>▣ Lưu thay đổi</button>
+      </div>
     </div>
 
     <div className="schedule-board-shell" style={scheduleBoardStyle}>
+      <div className="task-grid-column-selector" aria-label="Nhóm cột TaskGrid">
+        <button type="button" className={columnGroupVisibility.progress ? "active" : ""} aria-pressed={columnGroupVisibility.progress} onClick={() => toggleColumnGroup("progress")}>Tiến độ</button>
+        <button type="button" className={columnGroupVisibility.estimate ? "active" : ""} aria-pressed={columnGroupVisibility.estimate} onClick={() => toggleColumnGroup("estimate")}>Dự toán</button>
+        <button type="button" className={columnGroupVisibility.resource ? "active" : ""} aria-pressed={columnGroupVisibility.resource} onClick={() => toggleColumnGroup("resource")}>Nguồn lực</button>
+        <button type="button" className={areAllColumnGroupsVisible ? "active" : ""} aria-pressed={areAllColumnGroupsVisible} onClick={() => setColumnGroupVisibility({ basic: true, progress: true, estimate: true, resource: true })}>Tất cả</button>
+      </div>
       <div className="schedule-board-header">
-        <div className="schedule-table-grid schedule-grid-header">
-          <div>STT</div><div>Tác vụ</div><div className="task-name-column-header"><span>Tên công việc</span><span className="outline-controls" aria-label="Cấp Outline">{[1, 2, 3, 4].map((level) => <button key={level} type="button" className={outlineLevel === level ? "active" : ""} aria-pressed={outlineLevel === level} title={`Outline ${level}`} onClick={() => setOutlineLevel(level)}>{level}</button>)}</span><button type="button" className="column-resizer" aria-label="Kéo để thay đổi độ rộng cột Tên công việc" title={`Độ rộng hiện tại: ${Math.round(taskNameColumnWidth)}px`} onPointerDown={startTaskNameColumnResize} /></div><div>Thời lượng</div><div>Bắt đầu</div><div>Kết thúc</div>
+        <div ref={taskGridHeaderScrollRef} className="task-grid-header-scroll" onScroll={(event) => syncTaskGridHorizontalScroll(event.currentTarget.scrollLeft, "header")}>
+          <div className="task-grid-header-content" style={{ width: scheduleTableWidth }}>
+            <div className="schedule-table-grid schedule-group-header">
+              <div style={{ gridColumn: "span 3" }}>Cơ bản</div>
+              {columnGroupVisibility.progress && <div style={{ gridColumn: "span 5" }}>Tiến độ</div>}
+              {columnGroupVisibility.estimate && <div style={{ gridColumn: "span 3" }}>Dự toán</div>}
+              {columnGroupVisibility.resource && <div style={{ gridColumn: "span 4" }}>Nguồn lực</div>}
+            </div>
+            <div className="schedule-table-grid schedule-grid-header">
+              <div>STT</div><div>Tác vụ</div><div className="task-name-column-header"><span>Tên công việc</span><span className="outline-controls" aria-label="Cấp Outline">{[1, 2, 3, 4].map((level) => <button key={level} type="button" className={outlineLevel === level ? "active" : ""} aria-pressed={outlineLevel === level} title={`Outline ${level}`} onClick={() => setOutlineLevel(level)}>{level}</button>)}</span><button type="button" className="column-resizer" aria-label="Kéo để thay đổi độ rộng cột Tên công việc" title={`Độ rộng hiện tại: ${Math.round(taskNameColumnWidth)}px`} onPointerDown={startTaskNameColumnResize} /></div>
+              {columnGroupVisibility.progress && <><div>Thời lượng</div><div>Bắt đầu</div><div>Kết thúc</div><div>Trước</div><div>Tình trạng</div></>}
+              {columnGroupVisibility.estimate && <><div>Đơn vị</div><div>Khối lượng</div><div>Sản lượng/ngày</div></>}
+              {columnGroupVisibility.resource && <><div>HSM</div><div>SLM</div><div>NCLM</div><div>NCCH</div></>}
+            </div>
+          </div>
         </div>
         <div className="gantt-header-pane">
           <div ref={ganttHeaderScrollRef} className="gantt-header-scroll">
@@ -953,12 +1267,19 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       </div>
 
       <div className="schedule-board-body">
-      <div className="schedule-table-pane">
+      <div ref={taskGridBodyScrollRef} className="schedule-table-pane" onScroll={(event) => syncTaskGridHorizontalScroll(event.currentTarget.scrollLeft, "body")}>
         <div className="schedule-rows">
           {visibleItems.map((item) => {
             const isSelected = item.id === selectedItem?.id;
             const expandable = hasChildren(item.id);
             const derivedDates = item.type === "task" ? null : summaryDates.get(item.id);
+            const itemDependencies = incomingDependencies.get(item.id) ?? [];
+            const predecessorText = itemDependencies.length ? itemDependencies.map((dependency) => formatDependencyLabel(dependency, scheduleOrder)).join(";") : "—";
+            const predecessorTooltip = itemDependencies.map((dependency) => {
+              const predecessor = itemById.get(dependency.predecessorTaskId);
+              const lagText = dependency.lag ? ` ${dependency.lag > 0 ? "+" : ""}${dependency.lag} ngày` : "";
+              return `${scheduleOrder.get(dependency.predecessorTaskId) ?? "?"} — ${predecessor?.name ?? "Không tìm thấy công tác"} — ${dependency.dependencyType}${lagText}`;
+            }).join("\n");
             return <div key={item.id} className={`schedule-table-grid schedule-row row-${item.type} ${isSelected ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => setSelectedItemId(item.id)} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) setSelectedItemId(item.id); }}>
               <div className="wbs-cell" title={`WBS: ${item.wbs}`}>{scheduleOrder.get(item.id)}</div>
               <div className="row-actions">
@@ -966,14 +1287,18 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
               </div>
               <div className="task-name" style={{ paddingLeft: `${10 + scheduleDepth[item.type] * 18}px` }}>
                 {expandable ? <button className="tree-toggle" onClick={(event) => { event.stopPropagation(); toggleCollapse(item.id); }}>{collapsedIds.has(item.id) ? "›" : "⌄"}</button> : <span className="tree-spacer" />}
-                <InlineNameEditor value={item.name} autoEdit={autoEditItemId === item.id} onCommit={(name) => { setAutoEditItemId(null); setSelectedItemId(item.id); scheduleHistory.commit((current) => current.map((currentItem) => currentItem.id === item.id ? { ...currentItem, name } : currentItem), { description: `Đổi tên ${item.wbs} thành “${name}”` }); onNotice(`Đã đổi tên ${item.wbs}`); }} />{item.nature && <small>{item.nature}</small>}
+                <InlineNameEditor value={item.name} autoEdit={autoEditItemId === item.id} onCommit={(name) => { setAutoEditItemId(null); setSelectedItemId(item.id); commitItems((current) => current.map((currentItem) => currentItem.id === item.id ? { ...currentItem, name } : currentItem), { description: `Đổi tên ${item.wbs} thành “${name}”` }); onNotice(`Đã đổi tên ${item.wbs}`); }} />{item.nature && <small>{item.nature}</small>}
               </div>
-              {item.type === "task" ? <><div className="duration-cell"><input aria-label={`Thời lượng ${item.name}`} type="number" min="1" value={item.duration} onFocus={() => setSelectedItemId(item.id)} onChange={(event) => updateDuration(item, Number(event.target.value))} onKeyDown={(event) => { event.stopPropagation(); if (event.key === "Enter") event.currentTarget.blur(); }} /><span>ngày</span></div>
+              {columnGroupVisibility.progress && <>{item.type === "task" ? <><div className="duration-cell"><input aria-label={`Thời lượng ${item.name}`} type="number" min="1" value={item.duration} onFocus={() => setSelectedItemId(item.id)} onChange={(event) => updateDuration(item, Number(event.target.value))} onKeyDown={(event) => { event.stopPropagation(); if (event.key === "Enter") event.currentTarget.blur(); }} /><span>ngày</span></div>
               <div className="date-cell"><InlineDateEditor key={`${item.id}-start-${item.startDate}`} label={`Ngày bắt đầu ${item.name}`} value={item.startDate} onCommit={(value) => { setSelectedItemId(item.id); return updateScheduleDate(item, "startDate", value); }} onInvalid={() => onNotice("Ngày bắt đầu phải đúng định dạng dd/MM/yy")} /></div>
               <div className="date-cell"><InlineDateEditor key={`${item.id}-finish-${item.finishDate}`} label={`Ngày kết thúc ${item.name}`} value={item.finishDate} onCommit={(value) => { setSelectedItemId(item.id); return updateScheduleDate(item, "finishDate", value); }} onInvalid={() => onNotice("Ngày kết thúc phải đúng định dạng dd/MM/yy")} /></div></> : <><div className="duration-cell summary-value"><span>{derivedDates?.duration ?? "—"} {derivedDates ? "ngày" : ""}</span></div><div className="date-cell summary-value"><span>{derivedDates?.startDate ?? "—"}</span></div><div className="date-cell summary-value"><span>{derivedDates?.finishDate ?? "—"}</span></div></>}
+              <div className={`predecessor-cell ${item.type === "task" ? "editable" : ""}`} title={predecessorTooltip || "Không có công tác trước"} onDoubleClick={() => openDependencyEditor(item)}><span>{item.type === "task" ? predecessorText : "—"}</span></div>
+              <div className="plain-data-cell">—</div></>}
+              {columnGroupVisibility.estimate && <><div className="plain-data-cell">{item.type === "task" ? item.unit ?? "—" : "—"}</div><div className="numeric-data-cell">{item.type === "task" ? formatOptionalNumber(item.quantity) : "—"}</div><div className="numeric-data-cell">{item.type === "task" && item.quantity != null && item.duration > 0 ? formatOptionalNumber(item.quantity / item.duration) : "—"}</div></>}
+              {columnGroupVisibility.resource && <><div className="numeric-data-cell">{item.type === "task" ? formatOptionalNumber(item.machineShiftCoefficient) : "—"}</div><div className="numeric-data-cell">{item.type === "task" ? formatOptionalNumber(item.machineCount) : "—"}</div><div className="numeric-data-cell">{item.type === "task" ? formatOptionalNumber(item.managedLabor) : "—"}</div><div className="numeric-data-cell">{item.type === "task" ? formatOptionalNumber(item.permanentLabor) : "—"}</div></>}
             </div>;
           })}
-          {!visibleItems.length && <div className="schedule-empty">Chưa chọn dự án nào trong “Dự án hiển thị”.</div>}
+          {!visibleItems.length && <div className="schedule-empty">Chưa chọn dự án nào trong “Danh sách dự án”.</div>}
         </div>
       </div>
 
@@ -984,9 +1309,27 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
           const header = ganttHeaderScrollRef.current;
           if (header && Math.abs(header.scrollLeft - event.currentTarget.scrollLeft) > 1) header.scrollLeft = event.currentTarget.scrollLeft;
         }}>
-          {timeline ? <div className="gantt-content" style={{ width: timeline.width }}>
+          {timeline ? <div ref={ganttContentRef} className="gantt-content" style={{ width: timeline.width }}>
+            <svg className="gantt-dependency-layer" width={timeline.width} height={visibleItems.length * 35} aria-label="Quan hệ công việc trên Gantt">
+              <defs><marker id="dependency-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" /></marker></defs>
+              {dependencies.map((dependency) => {
+                const source = getTaskBarGeometry(dependency.predecessorTaskId);
+                const target = getTaskBarGeometry(dependency.successorTaskId);
+                if (!source || !target) return null;
+                const sourceX = dependency.dependencyType === "SS" || dependency.dependencyType === "SF" ? source.left : source.left + source.width;
+                const targetX = dependency.dependencyType === "FF" || dependency.dependencyType === "SF" ? target.left + target.width : target.left;
+                const elbowX = sourceX <= targetX ? sourceX + 12 : Math.max(sourceX, targetX) + 12;
+                const path = `M ${sourceX} ${source.y} H ${elbowX} V ${target.y} H ${targetX}`;
+                const isSelected = dependency.id === selectedDependencyId;
+                return <g key={dependency.id} className={`dependency-connector ${isSelected ? "selected" : ""}`} onClick={(event) => { event.stopPropagation(); setSelectedDependencyId(dependency.id); if (event.detail === 2) { const successor = itemById.get(dependency.successorTaskId); if (successor) openDependencyEditor(successor, dependency.id); } }} onDoubleClick={(event) => event.stopPropagation()}>
+                  <path className="dependency-hit-path" d={path} />
+                  <path className="dependency-visible-path" d={path} markerEnd="url(#dependency-arrow)" />
+                </g>;
+              })}
+              {dependencyDrag?.hasExceededThreshold && <path className="dependency-draft-path" d={`M ${dependencyDrag.sourcePoint.x} ${dependencyDrag.sourcePoint.y} H ${dependencyDrag.sourcePoint.x + 12} V ${dependencyDrag.pointerPosition.y} H ${dependencyDrag.pointerPosition.x}`} />}
+            </svg>
             <div className="gantt-rows">
-              {visibleItems.map((item) => {
+              {visibleItems.map((item, rowIndex) => {
                 const derivedDates = item.type === "task" ? null : summaryDates.get(item.id);
                 const itemStartDate = parseDisplayDate(derivedDates?.startDate ?? item.startDate);
                 const itemFinishDate = parseDisplayDate(derivedDates?.finishDate ?? item.finishDate);
@@ -998,7 +1341,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
                 const barWidth = Math.max(4, durationDays / ganttDayStep * ganttColumnWidth);
                 return <div key={item.id} className={`gantt-row row-${item.type} ${item.id === selectedItem?.id ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => setSelectedItemId(item.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setSelectedItemId(item.id); }}>
                   {timeline.todayColumnIndex >= 0 && <span className="today-column" style={{ left: timeline.todayColumnIndex * ganttColumnWidth, width: ganttColumnWidth }} />}
-                  {hasValidBar && (item.type === "task" ? <span className={`gantt-bar task-bar ${item.critical ? "critical" : ""} ${item.delayed ? "delayed" : ""}`} style={{ left: barLeft, width: barWidth }} title={`${item.name}: ${item.startDate}–${item.finishDate} · ${item.progress}%`}><i style={{ width: `${Math.max(0, Math.min(100, item.progress || 0))}%` }} /><b>{item.progress}%</b></span> : <span className={`summary-bar summary-${item.type}`} style={{ left: barLeft, width: barWidth }} title={`${item.name}: ${derivedDates?.startDate}–${derivedDates?.finishDate} · ${item.progress || 0}%`}><span className="summary-start-label">{derivedDates?.startDate.slice(0, 5)}</span><span className="summary-finish-label">{derivedDates?.finishDate.slice(0, 5)}</span><i className="summary-progress-line" style={{ width: `${Math.max(0, Math.min(100, item.progress || 0))}%` }} /></span>)}
+                  {hasValidBar && (item.type === "task" ? <span className={`gantt-bar task-bar ${dependencyDrag?.sourceTaskId === item.id && dependencyDrag.hasExceededThreshold ? "dependency-source-active" : ""} ${dependencyDrag?.hasExceededThreshold && isValidDependencyTarget(item) ? "dependency-target-valid" : ""}`} data-dependency-task data-task-id={item.id} style={{ left: barLeft, width: barWidth }} title={`${item.name}: ${item.startDate}–${item.finishDate} · ${item.progress}%`} onPointerDown={(event) => startDependencyDrag(event, item, barLeft, barWidth, rowIndex)}><i style={{ width: `${Math.max(0, Math.min(100, item.progress || 0))}%` }} /><b>{item.progress}%</b></span> : <span className={`summary-bar summary-${item.type}`} style={{ left: barLeft, width: barWidth }} title={`${item.name}: ${derivedDates?.startDate}–${derivedDates?.finishDate} · ${item.progress || 0}%`}><span className="summary-start-label">{derivedDates?.startDate.slice(0, 5)}</span><span className="summary-finish-label">{derivedDates?.finishDate.slice(0, 5)}</span><i className="summary-progress-line" style={{ width: `${Math.max(0, Math.min(100, item.progress || 0))}%` }} /></span>)}
                 </div>;
               })}
             </div>
@@ -1037,6 +1380,30 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       </div>
     </div>}
 
+    {dependencyEditorTask && <div className="dependency-editor-backdrop">
+      <section className="dependency-editor" role="dialog" aria-modal="true" aria-labelledby="dependency-editor-title">
+        <header><div><span>⌘</span><strong id="dependency-editor-title">Quan hệ công việc</strong></div><button type="button" aria-label="Đóng cửa sổ quan hệ" onClick={() => setDependencyEditorTaskId(null)}>×</button></header>
+        <div className="dependency-editor-target"><span>Công tác sau</span><strong>{scheduleOrder.get(dependencyEditorTask.id)} · {dependencyEditorTask.name}</strong></div>
+        <label className="dependency-search"><span>Tìm công tác trước</span><input value={dependencySearch} onChange={(event) => setDependencySearch(event.target.value)} placeholder="Nhập STT hoặc tên công tác..." /></label>
+        <div className="dependency-editor-grid dependency-editor-grid-header"><span>Công tác trước</span><span>Kiểu liên kết</span><span>Trễ / Sớm</span><span /></div>
+        <div className="dependency-editor-rows">
+          {dependencyDrafts.map((draft) => <div className="dependency-editor-grid" key={draft.id}>
+            <select aria-label="Công tác trước" value={draft.predecessorTaskId} onChange={(event) => setDependencyDrafts((current) => current.map((item) => item.id === draft.id ? { ...item, predecessorTaskId: event.target.value } : item))}>
+              {dependencyCandidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{scheduleOrder.get(candidate.id)} · {candidate.name}</option>)}
+              {!dependencyCandidates.some((candidate) => candidate.id === draft.predecessorTaskId) && <option value={draft.predecessorTaskId}>{scheduleOrder.get(draft.predecessorTaskId)} · {itemById.get(draft.predecessorTaskId)?.name}</option>}
+            </select>
+            <select aria-label="Loại quan hệ" value={draft.dependencyType} onChange={(event) => setDependencyDrafts((current) => current.map((item) => item.id === draft.id ? { ...item, dependencyType: event.target.value as DependencyType } : item))}><option value="FS">FS — Finish to Start</option><option value="SS">SS — Start to Start</option><option value="FF">FF — Finish to Finish</option><option value="SF">SF — Start to Finish</option></select>
+            <input aria-label="Trễ hoặc sớm" type="number" value={draft.lag} onChange={(event) => setDependencyDrafts((current) => current.map((item) => item.id === draft.id ? { ...item, lag: Math.trunc(Number(event.target.value) || 0) } : item))} />
+            <button type="button" aria-label="Xóa liên kết" title="Xóa liên kết" onClick={() => setDependencyDrafts((current) => current.filter((item) => item.id !== draft.id))}>⌫</button>
+          </div>)}
+          {!dependencyDrafts.length && <p className="dependency-editor-empty">Công tác chưa có quan hệ trước.</p>}
+        </div>
+        <div className="dependency-editor-helper"><button type="button" className="dependency-add-button" onClick={addDependencyDraft}>＋ Thêm quan hệ</button><small>Số dương = trễ · Số âm = sớm</small></div>
+        {dependencyEditorError && <p className="dependency-editor-error" role="alert">{dependencyEditorError}</p>}
+        <footer><button type="button" className="button secondary" onClick={() => setDependencyEditorTaskId(null)}>Hủy</button><button type="button" className="button primary" onClick={saveDependencyEditor}>OK</button></footer>
+      </section>
+    </div>}
+
     {deleteTarget && <div className="confirm-backdrop">
       <div ref={deleteDialogRef} className="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description">
         <header className="confirm-caption">
@@ -1065,7 +1432,6 @@ export default function Home() {
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [storageReady, setStorageReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [pickerOpen, setPickerOpen] = useState(true);
   const [activeMenu, setActiveMenu] = useState("projects");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"Tất cả" | ProjectStatus>("Tất cả");
@@ -1209,19 +1575,6 @@ export default function Home() {
           <button className="icon-button collapse-button" onClick={() => setSidebarOpen((value) => !value)} aria-label={sidebarOpen ? "Thu gọn thanh bên" : "Mở rộng thanh bên"}>{sidebarOpen ? "‹" : "›"}</button>
         </div>
 
-        <section className="project-picker">
-          <button className="picker-heading" onClick={() => setPickerOpen((value) => !value)} aria-expanded={pickerOpen}>
-            <span className="menu-symbol">◫</span>
-            {sidebarOpen && <><span><strong>Dự án hiển thị</strong><small>{visibleCount}/{projects.length} dự án được chọn</small></span><b>{pickerOpen ? "⌃" : "⌄"}</b></>}
-          </button>
-          {sidebarOpen && pickerOpen && <div className="picker-list">
-            {projects.map((project) => <label key={project.id} className="project-check">
-              <input type="checkbox" checked={project.visible} onChange={() => toggleVisibility(project.id)} aria-label={`Hiển thị ${project.name}`} />
-              <span><strong>{project.name}</strong><small>{project.code} · {project.status}</small></span>
-            </label>)}
-          </div>}
-        </section>
-
         <nav className="main-nav" aria-label="Phân hệ">
           {menuItems.map(([id, icon, label]) => <button key={id} className={activeMenu === id ? "active" : ""} onClick={() => { setActiveMenu(id); setNotice(id === "projects" ? "Đang ở Quản lý dự án" : id === "schedule" ? "Đang ở Quản lý tiến độ nhiều dự án" : `${label} sẽ được hoàn thiện ở bước tiếp theo`); }} title={!sidebarOpen ? label : undefined}>
             <span className="menu-symbol">{icon}</span>{sidebarOpen && <span>{label}</span>}
@@ -1235,18 +1588,17 @@ export default function Home() {
       </aside>
 
       <main className="app-main">
-        <header className="topbar">
-          {activeMenu === "schedule" ? <>
-            <div><p>{visibleCount} dự án đang hiển thị · Dữ liệu tiến độ mẫu V1</p><h1>Quản lý tiến độ nhiều dự án</h1></div>
-            <div className="topbar-actions"><button className="button secondary" onClick={() => setNotice("Lịch sử thay đổi sẽ được kết nối sau")}>◷ Lịch sử</button><button className="button primary" onClick={() => setNotice("Đã lưu dữ liệu tiến độ nháp trên phiên làm việc")}>▣ Lưu thay đổi</button></div>
-          </> : <>
+        {activeMenu !== "schedule" && <header className="topbar">
+          {activeMenu === "projects" ? <>
             <div><p>Danh mục dự án</p><h1>Quản lý dự án</h1></div>
             <div className="topbar-actions"><button className="button secondary" onClick={resetDemo}>Khôi phục dữ liệu mẫu</button><button className="button primary" onClick={openCreate}><span>＋</span> Tạo dự án</button></div>
+          </> : <>
+            <div><p>Phân hệ AlphaPMS</p><h1>{menuItems.find(([id]) => id === activeMenu)?.[2]}</h1></div>
           </>}
-        </header>
+        </header>}
 
         {activeMenu === "schedule" ? <ScheduleView projects={projects} onNotice={setNotice} /> : activeMenu !== "projects" ? (
-          <section className="placeholder-panel"><span className="placeholder-icon">◇</span><h2>{menuItems.find(([id]) => id === activeMenu)?.[2]}</h2><p>Khung điều hướng đã hoạt động. Chọn “Quản lý dự án” để tiếp tục thử dữ liệu dự án.</p><button className="button primary" onClick={() => setActiveMenu("projects")}>Quay lại Quản lý dự án</button></section>
+          <section className="placeholder-panel"><span className="placeholder-icon">◇</span><h2>{menuItems.find(([id]) => id === activeMenu)?.[2]}</h2><p>Phân hệ này sẽ được hoàn thiện ở bước tiếp theo. Chọn “Danh sách dự án” để tiếp tục quản lý phạm vi dự án.</p><button className="button primary" onClick={() => setActiveMenu("projects")}>Mở Danh sách dự án</button></section>
         ) : <>
           <section className="summary-grid" aria-label="Tổng quan dự án">
             <article><span>Tổng dự án</span><strong>{projects.length}</strong><small>{activeCount} đang thực hiện</small></article>

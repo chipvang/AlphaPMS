@@ -2,7 +2,7 @@
 
 - **Trạng thái:** Đã chốt giao diện V1.
 - **Ngày chốt:** 20/08/2026.
-- **Phạm vi hoàn thành:** Bố cục, thao tác cây tiến độ, inline edit, Undo/Redo, lịch và thanh Gantt, vùng cuộn kiểu Excel, chú giải và các chế độ hiển thị `TaskDetail`.
+- **Phạm vi hoàn thành:** Bố cục, thao tác cây tiến độ, inline edit, Undo/Redo, lịch và thanh Gantt, quan hệ công việc FS/SS, vùng cuộn kiểu Excel, chú giải và các chế độ hiển thị `TaskDetail`.
 
 ## 1. Mục đích
 
@@ -50,15 +50,19 @@ Màn hình gồm bốn khu vực chính; từ ngày 20/08/2026 thống nhất t�
 
 ## 4. Thanh điều hướng bên trái
 
-### 4.1. Bộ chọn dự án
+### 4.1. Danh sách dự án và phạm vi hiển thị
 
-Thanh trái phải có khu vực **Dự án hiển thị**, cho phép chọn một hoặc nhiều dự án bằng checkbox.
+`LeftSlider` không hiển thị trực tiếp danh sách dự án và không chứa bộ checkbox bung/thu. Mục đầu tiên là **Danh sách dự án**, hoạt động thống nhất như các mục điều hướng khác.
 
 Yêu cầu:
 
+- Bấm **Danh sách dự án** phải mở màn hình **Quản lý dự án**.
+- Bấm **Quản lý tiến độ** phải mở màn hình **Quản lý tiến độ nhiều dự án**.
+- Trạng thái chọn của `LeftSlider` phải phản ánh đúng màn hình đang hiển thị.
+- Việc chọn dự án tham gia phạm vi hiển thị được thực hiện tại màn hình Quản lý dự án hoặc bộ lọc/phạm vi của từng phân hệ, không bung danh sách ngay trong `LeftSlider`.
 - Có thể hiển thị đồng thời nhiều dự án.
 - Có thể bỏ chọn từng dự án mà không ảnh hưởng dữ liệu của dự án đó.
-- Hiển thị số lượng dự án đang chọn, ví dụ `3/3`.
+- Màn hình nghiệp vụ hiển thị số lượng dự án đang chọn, ví dụ `3/3`.
 - Khi thay đổi danh sách chọn, bảng WBS và Gantt cập nhật đồng thời.
 - Người dùng có thể nhập và chỉnh sửa dữ liệu của mọi dự án đang hiển thị nếu có quyền.
 - Mọi thao tác sửa phải xác định rõ `project_id` của dòng dữ liệu.
@@ -67,10 +71,10 @@ Yêu cầu:
 
 Thanh trái dành chỗ cho các chức năng:
 
+- Danh sách dự án.
 - Quản lý tiến độ.
 - Quản lý dự toán.
 - Nguồn lực và chi phí.
-- Danh mục dự án.
 - Danh mục dùng chung.
 - Cấu hình.
 - Thông tin phần mềm.
@@ -95,19 +99,25 @@ Các nút cấp màn hình:
 
 Khi lưu nhiều dự án, hệ thống phải kiểm tra quyền và lỗi dữ liệu theo từng dự án. Lỗi của một dự án không được làm mất thay đổi chưa lưu của dự án khác.
 
+Từ lần tinh chỉnh ngày 20/08/2026, màn hình tiến độ không duy trì Page Header riêng. Tiêu đề/caption cũ và thanh tác vụ được hợp nhất thành một `TopMenu` duy nhất, nằm ngay trên `TaskGrid + GanttTimeline`.
+
 ## 6. Thanh tác vụ trên bảng
 
 Giữ cố định các nút sau:
 
-1. **Thêm công việc**.
-2. **Phân bổ BOQ**.
-3. **Quan hệ công việc**.
-4. **Lịch làm việc**.
-5. **Lọc**.
+1. **Nhập từ Excel**.
+2. **Hoàn tác**.
+3. **Làm lại**.
+4. **Lọc**.
+5. **Lịch làm việc**.
+6. **Lịch sử**.
+7. **Lưu thay đổi**.
 
-### 6.1. Thêm công việc
+### 6.1. Nhập từ Excel
 
-Thêm một dòng mới vào dự án và vị trí WBS đang chọn. Loại phần tử có thể gồm:
+Mở luồng nhập danh sách tiến độ từ Excel. Chi tiết mapping cột, kiểm tra dữ liệu và preview trước khi nhập sẽ được đặc tả ở bước riêng; nút hiện tại giữ vị trí chính bên trái TopMenu.
+
+Thêm một dòng riêng lẻ vẫn thực hiện bằng hai thao tác trực tiếp trong cột Tác vụ:
 
 - Hạng mục.
 - Nhóm công việc.
@@ -148,6 +158,13 @@ Nút Lọc sẽ mở một cửa sổ thiết lập điều kiện ở phiên b�
 - Công việc chậm tiến độ.
 - Cấp hiển thị lịch: tháng/tuần/ngày hoặc quý/tháng/tuần.
 
+### 6.6. Bố cục TopMenu chính thức
+
+- Bên trái: **Nhập từ Excel**, **Hoàn tác**, **Làm lại**, **Lọc**.
+- Bên phải: **Lịch làm việc**, **Cách nhau: n ngày**, **Lịch sử**, **Lưu thay đổi**.
+- Không có Page Header, Caption Bar hoặc toolbar chính thứ hai nằm giữa TopMenu và vùng làm việc.
+- Ngay dưới TopMenu là `TaskGrid | GanttTimeline`; tiếp theo là dải legend mỏng và `TaskDetail` hiện có.
+
 ## 7. Cấu trúc cây công việc
 
 Cột **Tên công việc** hiển thị cây theo đúng trình tự:
@@ -179,22 +196,18 @@ Quy tắc:
 
 ## 8. Các cột của bảng
 
-Thứ tự cột đề xuất:
+TaskGrid tổ chức theo thứ tự cố định **Cơ bản | Tiến độ | Dự toán | Nguồn lực** và dùng header hai cấp: dòng trên là tên nhóm, dòng dưới là tên cột.
 
-1. **STT** — số thứ tự hiển thị dẫn xuất.
-2. **Tác vụ**.
-3. **Tên công việc** — `name`.
-4. **Thời lượng** — `duration`.
-5. **Bắt đầu** — `start_date`.
-6. **Kết thúc** — `finish_date`.
+- **Cơ bản**: STT, Tác vụ, Tên công việc. Nhóm này luôn hiển thị để giữ ngữ cảnh cây WBS.
+- **Tiến độ**: Thời lượng, Bắt đầu, Kết thúc, Trước, Tình trạng.
+- **Dự toán**: Đơn vị, Khối lượng, Sản lượng/ngày. Sản lượng/ngày được tính từ `quantity / duration`; thiếu dữ liệu thì hiển thị `—`.
+- **Nguồn lực**: HSM, SLM, NCLM, NCCH. Đây chỉ là caption rút gọn; tên field/model không thay đổi.
 
-Có thể bổ sung ở giai đoạn hoàn thiện:
+Ngay phía trên TaskGrid/Gantt có dải chọn nhóm mỏng gồm **Tiến độ, Dự toán, Nguồn lực, Tất cả**. Không có nút Cơ bản vì nhóm này luôn hiển thị và không thể tắt. Ba nhóm tùy chọn là các nút bật/tắt đồng thời, không dùng checkbox hoặc icon. Mặc định bật Tiến độ; Dự toán và Nguồn lực tắt, nên TaskGrid hiển thị Cơ bản + Tiến độ. Nút Tất cả chỉ bật đủ ba nhóm tùy chọn, không dùng để tắt toàn bộ; nút active khi cả ba nhóm tùy chọn đang bật và bấm lại vẫn giữ nguyên.
 
-- Tiến độ hoàn thành — `progress_percent`.
-- Trạng thái — `status`.
-- Khối lượng kế hoạch — `planned_quantity`.
-- Khối lượng thực hiện — `actual_quantity`.
-- Đơn vị — `unit_id`.
+Khi tắt một nhóm, cả header nhóm, header cột và các ô dữ liệu tương ứng được loại khỏi lưới; các nhóm còn lại tự dồn liền nhau. Nếu tổng chiều rộng TaskGrid vượt khung nhìn thì TaskGrid được cuộn ngang riêng, còn Gantt giữ tối thiểu 320px và nhận toàn bộ phần chiều rộng còn lại. Việc bật/tắt nhóm không thay đổi dữ liệu và không tác động các chức năng Gantt, quan hệ công việc, Auto Schedule, Undo/Redo, WBS hoặc Outline.
+
+Các trường Dự toán/Nguồn lực mới chỉ là thuộc tính tùy chọn của model giao diện V1, chưa thay đổi schema lưu trữ. Không tạo dữ liệu giả; mọi giá trị chưa được khai báo hiển thị `—`.
 
 ### 8.1. Chỉnh sửa trực tiếp trên lưới
 
@@ -216,10 +229,13 @@ Các cột nhập nhanh hỗ trợ inline edit theo nguyên tắc:
 
 ### 8.2. Mật độ hiển thị cột
 
-- Cột **Thời lượng** đủ rộng để caption hiển thị trên một dòng.
-- Cột **Tên công việc** có độ rộng mặc định và tối thiểu **400px**. Cạnh phải header có tay nắm kéo để mở rộng hoặc thu lại, nhưng không được nhỏ hơn 400px; giới hạn giao diện V1 là 900px.
-- Hai cột dữ liệu **Bắt đầu/Kết thúc** có độ rộng 88px, tăng thêm 4px so với thiết kế ngay trước đó và dùng cùng cỡ font với toàn bộ phần bảng công việc.
-- Việc điều chỉnh trên chỉ áp dụng cho vùng bảng bên trái. Vùng lịch và biểu đồ Gantt phía sau giữ nguyên kích thước để được thiết kế riêng ở bước tiếp theo.
+- Độ rộng chính thức: Cơ bản = STT 50px, Tác vụ 116px, Tên công việc 415px; tổng 581px.
+- Tiến độ = Thời lượng 60px, Bắt đầu 70px, Kết thúc 70px, Trước 50px, Tình trạng 96px; tổng 346px.
+- Dự toán = Đơn vị 60px, Khối lượng 86px, Sản lượng/ngày 100px; tổng 246px.
+- Nguồn lực = HSM 50px, SLM 50px, NCLM 60px, NCCH 60px; tổng 220px.
+- Khi bật Tất cả, TaskGrid rộng 1.393px tại độ rộng mặc định của cột Tên công việc. Không tự co giãn các cột theo nội dung.
+- Cột **Tên công việc** có độ rộng mặc định và tối thiểu **415px**. Cạnh phải header có tay nắm kéo; giới hạn giao diện V1 hiện tại là 915px.
+- Header nhóm, header cột và body dùng chung một định nghĩa cột động. Khi ẩn nhóm, toàn bộ phần tương ứng bị loại khỏi lưới và nhóm phía sau dồn sát sang trái.
 - Font caption bảng dùng design token chung `--table-header-font-size`, không khai báo rời theo từng cột; sau này có thể đưa token này vào cấu hình giao diện.
 
 ## 9. Cột tác vụ
@@ -367,6 +383,96 @@ Phạm vi và mật độ lịch:
 - Thanh HScroll của Gantt được tách khỏi nội dung và neo cố định ở đáy vùng Gantt, luôn hiển thị khi vùng thời gian rộng hơn khung nhìn. Thanh này cuộn đồng thời caption Timeline và thân biểu đồ nhưng không làm dịch chuyển TaskGrid.
 - Không phân trang công tác trong màn hình tiến độ vì phân trang làm mất khả năng quan sát tổng thể Gantt.
 
+### 10.4. Quan hệ công việc
+
+#### 10.4.1. Model và nguồn dữ liệu
+
+Quan hệ trước–sau dùng model logic `TaskDependency`:
+
+```ts
+type DependencyType = "FS" | "SS" | "FF" | "SF";
+
+type TaskDependency = {
+  id: string;
+  projectId: string;
+  predecessorTaskId: string;
+  successorTaskId: string;
+  dependencyType: DependencyType;
+  lag: number;
+};
+```
+
+- Khóa liên kết bắt buộc là `task_id`; không lưu STT, WBS, chỉ số dòng hoặc thứ tự hiển thị làm khóa.
+- Kéo trực tiếp TaskBar tạo `FS 0`; Dependency Editor cho sửa đủ `FS`, `SS`, `FF`, `SF`.
+- TaskGrid, Dependency Editor và Gantt Dependency Layer dùng chung một danh sách `TaskDependency`.
+- Dữ liệu công tác và dependency nằm trong cùng `ScheduleState`, sử dụng chung cơ chế Undo/Redo.
+- Prototype hiện chưa có backend/schema tiến độ chính thức nên chưa tạo migration. Khi có backend phải ánh xạ model trên vào schema đã chốt.
+
+#### 10.4.2. Cột Trước — Predecessors
+
+- Cột **Trước** nằm ngay sau **Kết thúc**, rộng 50px và không làm tăng chiều cao dòng.
+- Không có quan hệ hiển thị `—`.
+- Hiển thị rút gọn theo STT hiện tại của predecessor: `1FS`, `2FS+2`, `4SS-1`, nhiều quan hệ phân cách bằng dấu `;`.
+- `lag = 0` không hiển thị `+0`; lag dương có dấu `+`, lead âm giữ dấu `-`.
+- Nội dung dài dùng ellipsis; hover hiển thị STT, tên công tác, loại quan hệ và lag đầy đủ.
+- Sau khi đổi thứ tự cây, text STT được tính lại nhưng `predecessorTaskId` không thay đổi.
+- Double-click cell của TaskItem mở Dependency Editor; dòng Summary chỉ hiển thị `—` và không cho sửa.
+
+#### 10.4.3. Dependency Editor
+
+- Popup nhỏ, modal, không dùng cửa sổ lớn và không dùng alert native.
+- Hiển thị công tác sau, ô tìm predecessor theo STT/tên, danh sách quan hệ gồm Công tác trước, Quan hệ, Lag và nút xóa.
+- Selector chỉ liệt kê TaskItem cùng dự án, không liệt kê chính task hiện tại hoặc Summary.
+- Quan hệ mới mặc định `FS`, `lag = 0`; cho chọn `FS`, `SS`, `FF`, `SF`, nhập lag dương hoặc lead âm.
+- **OK** kiểm tra toàn bộ và lưu thành một bước Undo/Redo; **Hủy** đóng popup và không thay đổi dữ liệu.
+
+#### 10.4.4. Kéo trực tiếp TaskBar trên Gantt
+
+- Không sử dụng `DependencyStartAnchor` hoặc `DependencyFinishAnchor`; TaskBar luôn là hình chữ nhật sạch, không có vòng tròn ở hai đầu.
+- Nhấn và kéo trực tiếp thân `TaskBar A` rồi thả vào `TaskBar B` tạo ngay quan hệ `A → B`, loại `FS`, `lag = 0`; không mở hộp thoại xác nhận.
+- Chuyển động dưới 5px được coi là click chọn công tác. Chỉ khi vượt ngưỡng mới bắt đầu dependency drag; click không thay đổi ngày.
+- Trong lúc kéo, preview xuất phát từ cạnh phải TaskBar nguồn; nguồn active nhẹ và target hợp lệ có outline nhẹ. Thả vùng trống hoặc nhấn `Escape` thì hủy và không tạo history entry.
+- Trong V1, kéo thân TaskBar chỉ có nghĩa tạo dependency; không dùng để đổi ngày hoặc resize Duration.
+
+#### 10.4.5. Gantt Dependency Layer
+
+- Connector được vẽ trong một SVG overlay duy nhất phủ thân Gantt, dùng đường gấp khúc ngang–đứng–ngang và arrow head ở target.
+- Layer nằm trên nền grid nhưng dưới TaskBar, không tạo scrollbar riêng và dùng cùng hệ tọa độ nội dung Gantt nên đồng bộ với cuộn ngang/dọc, Outline, collapse, resize và `day_step`.
+- Chỉ vẽ connector khi cả predecessor và successor đang visible. Dependency vẫn tồn tại khi endpoint bị ẩn.
+- Click connector đặt `selectedDependencyId`; nhấn `Delete` xóa dependency, không xóa Task. Khi focus input/select/textarea, phím Delete không bị chiếm.
+- Connector có hit-path trong suốt 10px để dễ thao tác. Double-click connector mở cùng Dependency Editor đang dùng bởi cell **Trước**.
+
+#### 10.4.6. Validation và Undo/Redo
+
+Trước khi tạo hoặc lưu phải kiểm tra:
+
+- Không liên kết một task với chính nó.
+- Không tạo trùng cặp predecessor–successor; đổi FS/SS thực hiện trên quan hệ hiện có.
+- Không tạo vòng phụ thuộc; phát hiện cycle trong helper nghiệp vụ độc lập với component UI.
+- Không liên kết Summary.
+- V1 không cho dependency khác dự án.
+
+Tạo bằng kéo, thêm/sửa/xóa bằng editor, đổi FS/SS/FF/SF, đổi lag và xóa connector đều là một bước Undo/Redo hoàn chỉnh. Việc tạo/sửa/xóa dependency, dịch toàn bộ successor, cập nhật Summary và connector là một commit duy nhất.
+
+#### 10.4.7. Auto Schedule theo dependency
+
+- Logic đặt trong helper nghiệp vụ `lib/schedule/dependencies.ts`, độc lập với component React.
+- Mọi dependency được quy đổi thành constraint lên ngày bắt đầu của successor. Riêng FS dùng quy tắc chính thức: `FS0 = predecessor.finish + 1 ngày`; khi `lag > 0`, `requiredStart = finish + 1 + lag`; khi `lag < 0`, `requiredStart = finish + lag`. Ví dụ Finish `07/08/26`: FS0 → `08/08/26`, FS+1 → `09/08/26`, FS-1 → `06/08/26`. Các công thức SS/FF/SF giữ nguyên implementation hiện tại.
+- Nếu có nhiều predecessor, successor lấy ngày bắt đầu lớn nhất trong toàn bộ constraint. Không lấy ngày nhập tay cũ làm giới hạn.
+- Duration của successor được giữ nguyên; `finish = start + duration - 1`.
+- Thay đổi ngày predecessor, tạo/sửa/xóa quan hệ sẽ lan truyền theo thứ tự topo xuống toàn bộ successor trong DAG.
+- Khi xóa link mà successor không còn predecessor, giữ nguyên Start/Finish hiện tại; nếu còn predecessor khác thì tính lại theo các constraint còn lại.
+- Summary không nhận dependency trực tiếp; Start/Finish tiếp tục dẫn xuất bằng min/max từ TaskItem hậu duệ.
+
+#### 10.4.8. Màu và nền mặc định
+
+- TaskBar mới và TaskBar không có màu do người dùng gán dùng thống nhất `--gantt-task-default: #4F81BD`, border `#3B6FA5`; không random và không tự đổi theo dự án, nhóm hoặc tính chất.
+- ProBar, WPBar, WGBar giữ tông xám trung tính đã chốt.
+- Nền mặc định của mọi dòng Project, Hạng mục, Nhóm và Task trong TaskGrid và GanttTimeline là trắng. Phân cấp thể hiện bằng STT, indent, font, expand/collapse và Summary Bar.
+- Hover/selected chỉ dùng chỉ báo nhẹ, không lưu màu nền theo `ItemType`; cột ngày hiện tại vẫn giữ nền đánh dấu riêng.
+- Đường kẻ dọc/ngang, border header và splitter giữa TaskGrid/GanttTimeline dùng chung token xám trung tính của form/control: `--line: #D9D9D9`, `--line-strong: #BFBFBF`; không dùng đường lưới mang sắc xanh. Nền body hai vùng giữ `#FFFFFF`.
+- Chân khối header dùng một border xám đậm 2px chạy liền mạch qua TaskGrid và toàn bộ caption ba dòng Tháng/Tuần/Ngày, phân cách rõ header cố định với vùng dữ liệu bên dưới mà không làm lệch hai pane.
+
 ## 11. Chú giải và dòng đang chọn
 
 Bên dưới bảng/Gantt hiển thị:
@@ -451,7 +557,7 @@ Các nội dung đã thống nhất:
 - Chọn và chỉnh sửa nhiều dự án đồng thời.
 - Cây dữ liệu theo `Dự án → Hạng mục → Nhóm → Công tác`.
 - Cột tác vụ nằm ngay sau WBS.
-- Giữ năm nút: Thêm công việc, Phân bổ BOQ, Quan hệ công việc, Lịch làm việc và Lọc.
+- TopMenu giữ các nút: Nhập từ Excel, Hoàn tác, Làm lại, Lọc, Lịch làm việc, Lịch sử và Lưu thay đổi; Lọc nằm ngay sau Làm lại.
 - Cấp lịch nằm trong cửa sổ Lọc, không có nút riêng trên thanh công cụ.
 - Lịch Gantt mặc định hiển thị Tháng/Tuần/Ngày.
 - Giữ vùng chú giải, công việc đang chọn, chi tiết công việc và khối lượng dự toán đã phân bổ.

@@ -4,8 +4,8 @@
   --bg: #eef2f5;
   --surface: #fff;
   --surface-soft: #f7f9fa;
-  --line: #d7e0e5;
-  --line-strong: #c5d0d7;
+  --line: #d9d9d9;
+  --line-strong: #bfbfbf;
   --text: #17232c;
   --muted: #687984;
   --primary: #087f8d;
@@ -19,6 +19,11 @@
   --table-header-font-size: 11px;
   --danger: #b84a4a;
   --warning: #a96812;
+  --gantt-task-default: #4f81bd;
+  --gantt-task-border: #3b6fa5;
+  --gantt-task-progress: #315f96;
+  --task-row-background: #fff;
+  --gantt-row-background: #fff;
   --shadow: 0 14px 36px rgba(27, 50, 63, .12)
 }
 
@@ -159,84 +164,9 @@ button {
   border-color: var(--line-strong)
 }
 
-.project-picker {
-  border-bottom: 1px solid var(--line);
-  padding: 7px 6px
-}
-
-.picker-heading {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  width: 100%;
-  min-height: 37px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px;
-  border-radius: 6px;
-  text-align: left
-}
-
-.picker-heading:hover,
 .main-nav button:hover,
 .sidebar-footer button:hover {
   background: #edf1f3
-}
-
-.picker-heading>span:nth-child(2) {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-  flex: 1
-}
-
-.picker-heading small {
-  font-size: 10px;
-  color: var(--muted)
-}
-
-.picker-list {
-  display: grid;
-  gap: 2px;
-  padding: 4px 3px 5px 31px;
-  max-height: 190px;
-  overflow: auto
-}
-
-.project-check {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  padding: 6px 4px;
-  border-radius: 5px
-}
-
-.project-check:hover {
-  background: #edf1f3
-}
-
-.project-check input {
-  accent-color: var(--primary);
-  margin-top: 2px
-}
-
-.project-check span {
-  min-width: 0;
-  display: grid;
-  gap: 2px
-}
-
-.project-check strong {
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis
-}
-
-.project-check small {
-  color: var(--muted);
-  font-size: 10px
 }
 
 .main-nav {
@@ -964,7 +894,7 @@ button {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 10px 12px 12px;
+  padding: 0 12px 12px;
   gap: 8px;
   overflow: hidden
 }
@@ -972,9 +902,21 @@ button {
 .schedule-toolbar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 38px;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 50px;
   flex: 0 0 auto
+}
+
+.schedule-toolbar-left,
+.schedule-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px
+}
+
+.schedule-toolbar-right {
+  margin-left: auto
 }
 
 .gantt-step-control {
@@ -1018,7 +960,7 @@ button {
 
 .schedule-board-shell {
   display: grid;
-  grid-template-rows: 74px minmax(0, 1fr) 17px;
+  grid-template-rows: 30px 74px minmax(0, 1fr) 17px;
   min-height: 0;
   flex: 1 1 0
 }
@@ -1026,16 +968,46 @@ button {
 .schedule-board-header,
 .schedule-board-body {
   display: grid;
-  grid-template-columns: var(--schedule-table-width, 750px) minmax(0, 1fr);
+  grid-template-columns: min(var(--schedule-table-width, 928px), calc(100% - 320px)) minmax(320px, 1fr);
   min-width: 0
+}
+
+.task-grid-column-selector {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: var(--surface-soft)
+}
+
+.task-grid-column-selector button {
+  height: 23px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--ui-min-font-size);
+  cursor: pointer
+}
+
+.task-grid-column-selector button:hover,
+.task-grid-column-selector button.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-dark)
 }
 
 .schedule-board-header {
   padding-right: 15px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-bottom: 0;
-  border-radius: 8px 8px 0 0;
+  border-bottom: 2px solid var(--line-strong);
+  border-radius: 0;
   overflow: hidden
 }
 
@@ -1050,13 +1022,47 @@ button {
 }
 
 .schedule-table-pane {
-  min-width: 0
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden
 }
 
 .schedule-table-grid {
   display: grid;
-  grid-template-columns: 64px 116px var(--schedule-name-width, 400px) 94px 88px 88px;
+  grid-template-columns: var(--schedule-grid-template, 50px 116px var(--schedule-name-width, 415px) 60px 70px 70px 50px 96px);
   width: var(--schedule-table-width, 750px)
+}
+
+.task-grid-header-scroll {
+  min-width: 0;
+  height: 74px;
+  overflow: hidden;
+  scrollbar-width: none
+}
+
+.task-grid-header-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0
+}
+
+.task-grid-header-content {
+  height: 74px
+}
+
+.schedule-group-header {
+  height: 24px;
+  background: var(--surface-soft);
+  color: #50616b;
+  font-size: var(--table-header-font-size);
+  font-weight: 700;
+  white-space: nowrap
+}
+
+.schedule-group-header>div {
+  display: grid;
+  place-items: center;
+  border-right: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line)
 }
 
 .task-name-column-header {
@@ -1133,9 +1139,10 @@ button {
 }
 
 .schedule-grid-header {
-  min-height: 74px;
+  min-height: 50px;
+  height: 50px;
   background: var(--surface-soft);
-  border-bottom: 1px solid var(--line-strong);
+  border-bottom: 0;
   color: #50616b;
   font-size: var(--table-header-font-size);
   font-weight: 600;
@@ -1154,7 +1161,7 @@ button {
   grid-template-rows: 24px 22px 28px;
   height: 74px;
   background: #f8fafb;
-  border-bottom: 1px solid var(--line-strong);
+  border-bottom: 0;
   color: #50616b;
   font-size: var(--table-header-font-size);
   font-weight: 600;
@@ -1235,7 +1242,7 @@ button {
 
 .gantt-scrollbar-row {
   display: grid;
-  grid-template-columns: var(--schedule-table-width, 750px) minmax(0, 1fr);
+  grid-template-columns: min(var(--schedule-table-width, 928px), calc(100% - 320px)) minmax(320px, 1fr);
   min-width: 0;
   height: 17px;
   padding-right: 17px
@@ -1285,8 +1292,53 @@ button {
 }
 
 .gantt-content {
+  position: relative;
   min-height: 100%;
   background: var(--surface)
+}
+
+.gantt-dependency-layer {
+  position: absolute;
+  z-index: 3;
+  inset: 0 auto auto 0;
+  overflow: visible;
+  pointer-events: none
+}
+
+.gantt-dependency-layer marker path {
+  fill: #77858d
+}
+
+.dependency-connector {
+  pointer-events: stroke;
+  cursor: pointer
+}
+
+.dependency-hit-path {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 10px;
+  pointer-events: stroke
+}
+
+.dependency-visible-path,
+.dependency-draft-path {
+  fill: none;
+  stroke: #77858d;
+  stroke-width: 1.25px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none
+}
+
+.dependency-connector:hover .dependency-visible-path,
+.dependency-connector.selected .dependency-visible-path {
+  stroke: var(--primary-dark);
+  stroke-width: 2px
+}
+
+.dependency-draft-path {
+  stroke: var(--primary);
+  stroke-dasharray: 4 3
 }
 
 .gantt-row {
@@ -1296,23 +1348,14 @@ button {
   max-height: 35px;
   overflow: hidden;
   border-bottom: 1px solid var(--line);
-  background-color: var(--surface);
-  background-image: repeating-linear-gradient(to right, transparent 0, transparent 19px, #e5ebee 19px, #e5ebee 20px);
+  background-color: var(--gantt-row-background);
+  background-image: repeating-linear-gradient(to right, transparent 0, transparent 19px, var(--line) 19px, var(--line) 20px);
   cursor: pointer
-}
-
-.gantt-row.row-project,
-.gantt-row.row-workItem {
-  background-color: #f2f6f7
-}
-
-.gantt-row.row-group {
-  background-color: #f8fafb
 }
 
 .gantt-row:hover,
 .gantt-row.selected {
-  background-color: #edf7f8
+  box-shadow: inset 3px 0 0 var(--primary)
 }
 
 .today-column {
@@ -1339,13 +1382,13 @@ button {
   max-height: 35px;
   overflow: hidden;
   border-bottom: 1px solid var(--line);
-  background: var(--surface);
+  background: var(--task-row-background);
   cursor: pointer
 }
 
 .schedule-row:hover,
 .schedule-row.selected {
-  background: #edf7f8
+  box-shadow: inset 3px 0 0 var(--primary)
 }
 
 .schedule-row>div {
@@ -1359,15 +1402,25 @@ button {
   border-right: 1px solid var(--line)
 }
 
+.plain-data-cell,
+.numeric-data-cell {
+  justify-content: center;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap
+}
+
+.numeric-data-cell {
+  justify-content: flex-end
+}
+
 .schedule-row.row-project,
 .schedule-row.row-workItem {
-  font-weight: 700;
-  background: #f2f6f7
+  font-weight: 700
 }
 
 .schedule-row.row-group {
-  font-weight: 600;
-  background: #f8fafb
+  font-weight: 600
 }
 
 .wbs-cell,
@@ -1461,6 +1514,34 @@ button {
 
 .date-cell {
   padding: 4px 3px !important
+}
+
+.predecessor-cell {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  border-right: 1px solid var(--line);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums
+}
+
+.predecessor-cell span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+
+.predecessor-cell.editable {
+  color: var(--text);
+  cursor: default
+}
+
+.predecessor-cell.editable:hover {
+  background: var(--primary-soft);
+  color: var(--primary-dark)
 }
 
 .inline-date-editor {
@@ -1685,7 +1766,7 @@ button {
 
 .gantt-bar {
   position: absolute;
-  z-index: 1;
+  z-index: 4;
   top: 9px;
   height: 17px;
   min-width: 12px;
@@ -1695,13 +1776,35 @@ button {
   box-shadow: inset 0 0 0 1px rgba(5, 91, 102, .17)
 }
 
+.task-bar {
+  overflow: visible;
+  cursor: pointer;
+  touch-action: none;
+  background: var(--gantt-task-default);
+  box-shadow: inset 0 0 0 1px var(--gantt-task-border)
+}
+
+.task-bar i {
+  background: var(--gantt-task-progress)
+}
+
+.task-bar.dependency-source-active {
+  cursor: grabbing;
+  outline: 2px solid rgba(59, 111, 165, .35)
+}
+
+.task-bar.dependency-target-valid {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px
+}
+
 .summary-bar {
   --summary-height: 14px;
   --summary-body-height: 10px;
   --summary-color: #aeb3b8;
   --summary-progress: #6f767c;
   position: absolute;
-  z-index: 2;
+  z-index: 4;
   top: 17px;
   height: var(--summary-body-height);
   min-width: 8px;
@@ -2002,6 +2105,165 @@ button {
   background: rgba(19, 32, 40, .34)
 }
 
+.dependency-editor-backdrop {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: auto
+}
+
+.dependency-editor {
+  width: min(620px, calc(100vw - 32px));
+  max-height: min(560px, calc(100vh - 40px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 14px 34px rgba(28, 45, 52, .22)
+}
+
+.dependency-editor>header {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px 5px 11px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-soft)
+}
+
+.dependency-editor>header>div {
+  display: flex;
+  align-items: center;
+  gap: 7px
+}
+
+.dependency-editor>header>button,
+.dependency-editor-grid>button {
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--muted)
+}
+
+.dependency-editor>header>button:hover,
+.dependency-editor-grid>button:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-dark)
+}
+
+.dependency-editor-target,
+.dependency-search {
+  display: grid;
+  gap: 4px;
+  padding: 9px 12px 0
+}
+
+.dependency-editor-target span,
+.dependency-search span {
+  color: var(--muted);
+  font-size: var(--ui-min-font-size)
+}
+
+.dependency-search input,
+.dependency-editor-grid select,
+.dependency-editor-grid input {
+  height: 30px;
+  min-width: 0;
+  padding: 4px 7px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit
+}
+
+.dependency-search input:focus,
+.dependency-editor-grid select:focus,
+.dependency-editor-grid input:focus {
+  border-color: var(--primary);
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--focus-ring)
+}
+
+.dependency-editor-grid {
+  display: grid;
+  grid-template-columns: minmax(210px, 1fr) 165px 80px 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px
+}
+
+.dependency-editor-grid-header {
+  margin-top: 9px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-weight: 600
+}
+
+.dependency-editor-rows {
+  max-height: 230px;
+  overflow-y: auto
+}
+
+.dependency-editor-empty {
+  margin: 0;
+  padding: 16px 12px;
+  color: var(--muted);
+  text-align: center
+}
+
+.dependency-add-button {
+  align-self: flex-start;
+  min-height: 29px;
+  margin: 7px 12px;
+  padding: 3px 9px;
+  border: 1px solid var(--primary);
+  border-radius: 4px;
+  background: var(--primary-soft);
+  color: var(--primary-dark)
+}
+
+.dependency-editor-helper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-right: 12px
+}
+
+.dependency-editor-helper small {
+  color: var(--muted)
+}
+
+.dependency-editor-error {
+  margin: 0 12px 7px;
+  color: var(--danger)
+}
+
+.dependency-editor>footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-soft)
+}
+
+.dependency-editor>footer .button {
+  width: 88px
+}
+
 .confirm-dialog {
   width: min(430px, 100%);
   overflow: hidden;
@@ -2224,9 +2486,6 @@ button {
   }
 
   .sidebar-expanded .brand-row>div:nth-child(2),
-  .sidebar-expanded .picker-heading>span:nth-child(2),
-  .sidebar-expanded .picker-heading b,
-  .sidebar-expanded .picker-list,
   .sidebar-expanded .main-nav button>span:last-child,
   .sidebar-expanded .sidebar-footer button>span:last-child,
   .sidebar-expanded .user-row>div:last-child {

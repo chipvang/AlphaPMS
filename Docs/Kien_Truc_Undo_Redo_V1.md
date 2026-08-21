@@ -68,7 +68,8 @@ Không sửa trực tiếp `undoStack` hoặc `redoStack` từ component.
 - Di chuyển nhiều dòng đang chọn là một bước.
 - Tăng cấp hoặc giảm cấp kèm tính lại WBS là một bước.
 - Dán một khối ô là một bước.
-- Kéo thanh Gantt làm thay đổi ngày và quan hệ liên quan là một bước khi người dùng thả chuột.
+- Kéo TaskBar nguồn sang TaskBar đích tạo `FS 0`, Auto Schedule toàn chuỗi successor và cập nhật Summary là một bước khi người dùng thả chuột.
+- Tạo, sửa loại, thay đổi lag hoặc xóa `TaskDependency` là một bước; mọi Start/Finish bị lan truyền cùng thuộc một `ScheduleState`, không tạo history riêng cho Dependency Editor, scheduler hay Gantt Dependency Layer.
 
 ### 6.2. Thay đổi liên tục
 
