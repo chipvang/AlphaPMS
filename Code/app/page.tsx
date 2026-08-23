@@ -1,99 +1,18 @@
 "use client";
 
-import { CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, FormEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useUndoRedo } from "../lib/history/useUndoRedo";
+import type { ProjectDto, ProjectInput, TaskDependencyDto, WorkItemDto } from "../lib/projects/types";
 import { DependencyType, formatDependencyLabel, propagateDependencySchedule, TaskDependency, validateTaskDependency } from "../lib/schedule/dependencies";
+import { buildTreeInsertionSlots, moveTreeItemToSlot, TreeInsertionSlot } from "../lib/schedule/treeReorder";
+import { convertTaskToGroupWithFollowingTasks } from "../lib/schedule/taskConversion";
+import { useCommonDialog } from "../lib/ui/useCommonDialog";
 
-type ProjectStatus = "Đang thực hiện" | "Chuẩn bị" | "Tạm dừng" | "Hoàn thành";
+type Project = ProjectDto;
+type ProjectStatus = ProjectDto["status"];
 
-type Project = {
-  id: string;
-  code: string;
-  name: string;
-  investor: string;
-  location: string;
-  manager: string;
-  startDate: string;
-  finishDate: string;
-  budget: number;
-  progress: number;
-  status: ProjectStatus;
-  description: string;
-  visible: boolean;
-  updatedAt: string;
-};
-
-const storageKey = "alphapms-projects-v1";
-
-const initialProjects: Project[] = [
-  {
-    id: "prj-bac-an",
-    code: "BA-2026",
-    name: "Dự án thoát nước Bắc An",
-    investor: "Ban QLDA Hạ tầng Bắc An",
-    location: "Bắc An, Hải Phòng",
-    manager: "Nguyễn Minh Tuấn",
-    startDate: "2026-08-20",
-    finishDate: "2027-04-30",
-    budget: 18426580000,
-    progress: 28,
-    status: "Đang thực hiện",
-    description: "Thi công hệ thống thoát nước, đường giao thông và hoàn trả hạ tầng.",
-    visible: true,
-    updatedAt: "17/08/2026 15:40",
-  },
-  {
-    id: "prj-song-xanh",
-    code: "CSX-02",
-    name: "Dự án cầu Sông Xanh",
-    investor: "Sở Xây dựng Thành phố",
-    location: "Quận Đông Hải",
-    manager: "Trần Hải Nam",
-    startDate: "2026-07-01",
-    finishDate: "2027-12-15",
-    budget: 42614900000,
-    progress: 16,
-    status: "Đang thực hiện",
-    description: "Cầu bê tông cốt thép dự ứng lực và đường dẫn hai đầu cầu.",
-    visible: true,
-    updatedAt: "16/08/2026 10:12",
-  },
-  {
-    id: "prj-factory-a2",
-    code: "NMA2-01",
-    name: "Nhà máy sản xuất A2",
-    investor: "Công ty Công nghiệp Alpha",
-    location: "KCN Nam Đình Vũ",
-    manager: "Lê Thu Hà",
-    startDate: "2026-10-01",
-    finishDate: "2027-08-20",
-    budget: 78500000000,
-    progress: 4,
-    status: "Chuẩn bị",
-    description: "Nhà xưởng, hạ tầng kỹ thuật và hệ thống phụ trợ.",
-    visible: false,
-    updatedAt: "15/08/2026 08:30",
-  },
-  {
-    id: "prj-road-5",
-    code: "GT-05",
-    name: "Nâng cấp tuyến đường số 5",
-    investor: "UBND Quận Nam Sơn",
-    location: "Nam Sơn",
-    manager: "Phạm Quang Huy",
-    startDate: "2025-11-12",
-    finishDate: "2026-09-30",
-    budget: 21800000000,
-    progress: 86,
-    status: "Tạm dừng",
-    description: "Nâng cấp nền, mặt đường, thoát nước và chiếu sáng.",
-    visible: false,
-    updatedAt: "12/08/2026 14:05",
-  },
-];
-
-const blankProject: Omit<Project, "id" | "updatedAt"> = {
+const blankProject: ProjectInput = {
   code: "",
   name: "",
   investor: "",
@@ -124,14 +43,46 @@ function formatOptionalNumber(value?: number) {
   return value == null ? "—" : new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(value);
 }
 
-function todayLabel() {
-  return new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date());
+async function requestApi<T>(url: string, init?: RequestInit): Promise<T> {
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "";
+  const response = await fetch(`${baseUrl}${url}`, { ...init, headers: { "content-type": "application/json", ...(init?.headers ?? {}) } });
+  if (response.status === 204) return undefined as T;
+  const body = await response.json() as { data?: T; error?: { message?: string } };
+  if (!response.ok) throw new Error(body.error?.message ?? "Không thể kết nối máy chủ.");
+  return body.data as T;
+}
+
+function isoToDisplayDate(value: string) {
+  if (!value) return "";
+  const [year, month, day] = value.split("-");
+  return year && month && day ? `${day}/${month}/${year.slice(-2)}` : value;
+}
+
+function displayToIsoDate(value: string) {
+  const parsed = parseDisplayDate(value);
+  if (!parsed) return "";
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+}
+
+function buildScheduleItems(projects: Project[], records: WorkItemDto[]) {
+  const byProject = new Map<string, WorkItemDto[]>();
+  records.forEach((record) => byProject.set(record.projectId, [...(byProject.get(record.projectId) ?? []), record]));
+  const result: ScheduleItem[] = [];
+  projects.forEach((project, projectIndex) => {
+    result.push({ id: project.id, projectId: project.id, parentId: null, type: "project", wbs: String.fromCharCode(65 + projectIndex), name: project.name.toLocaleUpperCase("vi"), duration: 1, startDate: isoToDisplayDate(project.startDate), finishDate: isoToDisplayDate(project.finishDate), progress: project.progress, ganttLeft: 0, ganttWidth: 1 });
+    const projectItems = byProject.get(project.id) ?? [];
+    const children = new Map<string | null, WorkItemDto[]>();
+    projectItems.forEach((item) => children.set(item.parentId, [...(children.get(item.parentId) ?? []), item]));
+    children.forEach((items) => items.sort((a, b) => a.sortOrder - b.sortOrder));
+    const append = (parentId: string | null, uiParentId: string) => {
+      (children.get(parentId) ?? []).forEach((item) => {
+        result.push({ ...item, parentId: uiParentId, wbs: "", startDate: isoToDisplayDate(item.startDate), finishDate: isoToDisplayDate(item.finishDate), ganttLeft: 0, ganttWidth: 1 });
+        append(item.id, item.id);
+      });
+    };
+    append(null, project.id);
+  });
+  return recalculateScheduleWbs(result);
 }
 
 type ScheduleItemType = "project" | "workItem" | "group" | "task";
@@ -149,6 +100,7 @@ type ScheduleItem = {
   progress: number;
   ganttLeft: number;
   ganttWidth: number;
+  sortOrder?: number;
   nature?: string;
   critical?: boolean;
   delayed?: boolean;
@@ -185,28 +137,22 @@ type DependencyDragState = {
   hasExceededThreshold: boolean;
 };
 
-const initialScheduleItems: ScheduleItem[] = [
-  { id: "ba", projectId: "prj-bac-an", parentId: null, type: "project", wbs: "A", name: "DỰ ÁN THOÁT NƯỚC BẮC AN", duration: 254, startDate: "20/08/26", finishDate: "30/04/27", progress: 28, ganttLeft: 2, ganttWidth: 92 },
-  { id: "ba-road", projectId: "prj-bac-an", parentId: "ba", type: "workItem", wbs: "A.1", name: "Hạng mục đường giao thông", duration: 128, startDate: "20/08/26", finishDate: "25/12/26", progress: 31, ganttLeft: 3, ganttWidth: 63 },
-  { id: "ba-fill", projectId: "prj-bac-an", parentId: "ba-road", type: "group", wbs: "A.1.1", name: "Nhóm san lấp nền đường", duration: 42, startDate: "20/08/26", finishDate: "30/09/26", progress: 46, ganttLeft: 4, ganttWidth: 32, nature: "San lấp" },
-  { id: "ba-k95", projectId: "prj-bac-an", parentId: "ba-fill", type: "task", wbs: "A.1.1.1", name: "Thi công nền đường K95 đoạn 1", duration: 23, startDate: "20/08/26", finishDate: "11/09/26", progress: 50, ganttLeft: 5, ganttWidth: 22, nature: "San lấp", critical: true, allocation: { code: "BB.22410", name: "Lắp cống D600", allocated: 240, total: 480, unit: "m" } },
-  { id: "ba-base", projectId: "prj-bac-an", parentId: "ba-road", type: "group", wbs: "A.1.2", name: "Nhóm móng mặt đường", duration: 51, startDate: "01/10/26", finishDate: "20/11/26", progress: 12, ganttLeft: 35, ganttWidth: 30, nature: "Base" },
-  { id: "ba-base-task", projectId: "prj-bac-an", parentId: "ba-base", type: "task", wbs: "A.1.2.1", name: "Rải cấp phối đá dăm loại I", duration: 18, startDate: "05/10/26", finishDate: "22/10/26", progress: 10, ganttLeft: 39, ganttWidth: 17, nature: "Base", delayed: true, allocation: { code: "AD.23230", name: "Làm móng cấp phối đá dăm", allocated: 1250, total: 1800, unit: "m³" } },
-  { id: "sx", projectId: "prj-song-xanh", parentId: null, type: "project", wbs: "B", name: "DỰ ÁN CẦU SÔNG XANH", duration: 533, startDate: "01/07/26", finishDate: "15/12/27", progress: 16, ganttLeft: 0, ganttWidth: 98 },
-  { id: "sx-bridge", projectId: "prj-song-xanh", parentId: "sx", type: "workItem", wbs: "B.1", name: "Hạng mục cầu chính", duration: 310, startDate: "01/07/26", finishDate: "06/05/27", progress: 19, ganttLeft: 1, ganttWidth: 77 },
-  { id: "sx-pile", projectId: "prj-song-xanh", parentId: "sx-bridge", type: "group", wbs: "B.1.1", name: "Nhóm thi công móng trụ", duration: 96, startDate: "10/08/26", finishDate: "13/11/26", progress: 24, ganttLeft: 10, ganttWidth: 39, nature: "Cọc" },
-  { id: "sx-pile-task", projectId: "prj-song-xanh", parentId: "sx-pile", type: "task", wbs: "B.1.1.1", name: "Khoan cọc nhồi trụ T1", duration: 31, startDate: "22/08/26", finishDate: "21/09/26", progress: 35, ganttLeft: 15, ganttWidth: 25, nature: "Cọc", allocation: { code: "AG.31121", name: "Khoan tạo lỗ cọc nhồi", allocated: 186, total: 420, unit: "m" } },
-];
+type WbsDragState = {
+  sourceId: string;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  isActive: boolean;
+};
 
-const initialTaskDependencies: TaskDependency[] = [
-  { id: "dep-ba-k95-base", projectId: "prj-bac-an", predecessorTaskId: "ba-k95", successorTaskId: "ba-base-task", dependencyType: "FS", lag: 0 },
-];
+type WbsSlotGeometry = TreeInsertionSlot & { x: number; y: number };
+type TaskContextMenuState = { taskId: string; x: number; y: number };
 
-const initialScheduleState: ScheduleState = { items: initialScheduleItems, dependencies: initialTaskDependencies };
+const initialScheduleState: ScheduleState = { items: [], dependencies: [] };
 
-const scheduleDepth: Record<ScheduleItemType, number> = { project: 0, workItem: 1, group: 2, task: 3 };
-const scheduleTypeByDepth: ScheduleItemType[] = ["project", "workItem", "group", "task"];
 const ganttColumnWidth = 20;
+const minimumTaskNameColumnWidth = 350;
+const scheduleRowHeight = 32;
 
 function isScheduleDescendant(item: ScheduleItem, ancestorId: string, itemMap: Map<string, ScheduleItem>) {
   let parentId = item.parentId;
@@ -215,6 +161,16 @@ function isScheduleDescendant(item: ScheduleItem, ancestorId: string, itemMap: M
     parentId = itemMap.get(parentId)?.parentId ?? null;
   }
   return false;
+}
+
+function getScheduleTreeDepth(item: ScheduleItem, itemMap: Map<string, ScheduleItem>) {
+  let depth = 0;
+  let parentId = item.parentId;
+  while (parentId) {
+    depth += 1;
+    parentId = itemMap.get(parentId)?.parentId ?? null;
+  }
+  return depth;
 }
 
 function recalculateScheduleWbs(items: ScheduleItem[]) {
@@ -491,24 +447,33 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
   const [dependencySearch, setDependencySearch] = useState("");
   const [dependencyEditorError, setDependencyEditorError] = useState("");
   const [dependencyDrag, setDependencyDrag] = useState<DependencyDragState | null>(null);
+  const [wbsDrag, setWbsDrag] = useState<WbsDragState | null>(null);
+  const wbsDragRef = useRef<WbsDragState | null>(null);
+  const wbsDropPreviewRef = useRef<TreeInsertionSlot | null>(null);
+  const wbsSlotGeometriesRef = useRef<WbsSlotGeometry[]>([]);
+  const wbsCaptureElementRef = useRef<HTMLDivElement | null>(null);
+  const wbsInsertionLineRef = useRef<HTMLDivElement | null>(null);
+  const suppressWbsClickRef = useRef(false);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const commonDialog = useCommonDialog();
   const [outlineLevel, setOutlineLevel] = useState(4);
   const [autoEditItemId, setAutoEditItemId] = useState<string | null>(null);
   const [taskDetailMode, setTaskDetailMode] = useState<"docked" | "collapsed" | "hidden">("docked");
   const [ganttDayStep, setGanttDayStep] = useState(1);
   const [taskNameColumnWidth, setTaskNameColumnWidth] = useState(415);
   const [columnGroupVisibility, setColumnGroupVisibility] = useState<TaskGridColumnGroupVisibility>({ basic: true, progress: true, estimate: false, resource: false });
-  const deleteDialogRef = useRef<HTMLDivElement>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(true);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [taskContextMenu, setTaskContextMenu] = useState<TaskContextMenuState | null>(null);
   const taskGridHeaderScrollRef = useRef<HTMLDivElement>(null);
   const taskGridBodyScrollRef = useRef<HTMLDivElement>(null);
   const ganttHeaderScrollRef = useRef<HTMLDivElement>(null);
   const ganttScrollRef = useRef<HTMLDivElement>(null);
   const ganttBottomScrollRef = useRef<HTMLDivElement>(null);
   const ganttContentRef = useRef<HTMLDivElement>(null);
-  const cancelDeleteButtonRef = useRef<HTMLButtonElement>(null);
-  const confirmDeleteButtonRef = useRef<HTMLButtonElement>(null);
+  const taskDetailNameInputRef = useRef<HTMLInputElement>(null);
   const visibleProjectIds = useMemo(() => new Set(projects.filter((project) => project.visible).map((project) => project.id)), [projects]);
+  const projectIdsKey = projects.map((project) => project.id).sort().join("|");
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const scheduleOrder = useMemo(() => calculateScheduleOrder(items), [items]);
   const incomingDependencies = useMemo(() => {
@@ -532,7 +497,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
   }, [itemById, items]);
   const visibleItems = useMemo(() => items.filter((item) => {
     if (!visibleProjectIds.has(item.projectId)) return false;
-    if (scheduleDepth[item.type] + 1 > outlineLevel) return false;
+    if (getScheduleTreeDepth(item, itemById) + 1 > outlineLevel) return false;
     let parentId = item.parentId;
     while (parentId) {
       if (collapsedIds.has(parentId)) return false;
@@ -610,7 +575,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     if (ganttBottomScrollRef.current) ganttBottomScrollRef.current.scrollLeft = 0;
   }, [timelineStartTime, visibleProjectKey]);
   const basicColumnWidths = [50, 116, taskNameColumnWidth];
-  const scheduleColumnWidths = [60, 70, 70, 50, 96];
+  const scheduleColumnWidths = [74, 70, 70, 50, 96];
   const estimateColumnWidths = [60, 86, 100];
   const resourceColumnWidths = [50, 50, 60, 60];
   const visibleColumnWidths = [
@@ -634,17 +599,80 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     return !keyword || `${scheduleOrder.get(item.id) ?? ""} ${item.name}`.toLocaleLowerCase("vi").includes(keyword);
   });
   const selectedSummaryDates = selectedItem?.type === "task" ? null : summaryDates.get(selectedItem?.id ?? "");
-  const deleteTarget = items.find((item) => item.id === deleteTargetId);
-  const deleteChildCount = deleteTarget ? items.filter((item) => {
-    let parentId = item.parentId;
-    while (parentId) {
-      if (parentId === deleteTarget.id) return true;
-      parentId = itemById.get(parentId)?.parentId ?? null;
-    }
-    return false;
-  }).length : 0;
+  const contextTask = taskContextMenu ? items.find((item) => item.id === taskContextMenu.taskId && item.type === "task") : undefined;
   const hasChildren = (itemId: string) => items.some((item) => item.parentId === itemId);
   const areAllColumnGroupsVisible = Object.values(columnGroupVisibility).every(Boolean);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(projects.map(async (project) => ({
+      workItems: await requestApi<WorkItemDto[]>(`/api/projects/${project.id}/work-items`),
+      dependencies: await requestApi<TaskDependencyDto[]>(`/api/projects/${project.id}/dependencies`),
+    })))
+      .then((groups) => {
+        if (cancelled) return;
+        scheduleHistory.reset({
+          items: buildScheduleItems(projects, groups.flatMap((group) => group.workItems)),
+          dependencies: groups.flatMap((group) => group.dependencies.map((dependency) => ({
+            id: dependency.id,
+            projectId: dependency.projectId,
+            predecessorTaskId: dependency.predecessorTaskId,
+            successorTaskId: dependency.successorTaskId,
+            dependencyType: dependency.dependencyType,
+            lag: dependency.lagDays,
+          }))),
+        });
+        setSelectedItemId(projects[0]?.id ?? "");
+        setScheduleLoading(false);
+      })
+      .catch((error: Error) => { if (!cancelled) { setScheduleLoading(false); onNotice(error.message); } });
+    return () => { cancelled = true; };
+  // Reload WBS only when the project collection changes, not when visibility/details change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectIdsKey]);
+
+  async function saveSchedule() {
+    setScheduleSaving(true);
+    try {
+      const saved = await Promise.all(projects.map(async (project) => {
+        const siblingCounts = new Map<string, number>();
+        const payload = items.filter((item) => item.projectId === project.id && item.type !== "project").map((item) => {
+          const parentId = item.parentId === project.id ? null : item.parentId;
+          const siblingKey = parentId ?? "root";
+          const sortOrder = (siblingCounts.get(siblingKey) ?? 0) + 1;
+          siblingCounts.set(siblingKey, sortOrder);
+          return { id: item.id, projectId: project.id, parentId, type: item.type, name: item.name, unit: item.unit, quantity: item.quantity, startDate: displayToIsoDate(item.startDate), finishDate: displayToIsoDate(item.finishDate), duration: item.duration, progress: item.progress, sortOrder };
+        });
+        const savedDependencies = await requestApi<TaskDependencyDto[]>(`/api/projects/${project.id}/dependencies`, {
+            method: "PUT",
+            body: JSON.stringify({ items: dependencies.filter((dependency) => dependency.projectId === project.id).map((dependency) => ({
+              predecessorTaskId: dependency.predecessorTaskId,
+              successorTaskId: dependency.successorTaskId,
+              dependencyType: dependency.dependencyType,
+              lagDays: dependency.lag,
+            })) }),
+          });
+        // Persist removed relations first so a confirmed Task -> Group conversion
+        // cannot be rejected by a relation that the same Save action removes.
+        const savedItems = await requestApi<WorkItemDto[]>(`/api/projects/${project.id}/work-items`, { method: "PUT", body: JSON.stringify({ items: payload }) });
+        return { savedItems, savedDependencies };
+      }));
+      scheduleHistory.reset({
+        items: buildScheduleItems(projects, saved.flatMap((group) => group.savedItems)),
+        dependencies: saved.flatMap((group) => group.savedDependencies.map((dependency) => ({
+          id: dependency.id,
+          projectId: dependency.projectId,
+          predecessorTaskId: dependency.predecessorTaskId,
+          successorTaskId: dependency.successorTaskId,
+          dependencyType: dependency.dependencyType,
+          lag: dependency.lagDays,
+        }))),
+      });
+      onNotice("Đã lưu cây WBS và quan hệ công việc vào cơ sở dữ liệu");
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : "Không thể lưu cây WBS");
+    } finally { setScheduleSaving(false); }
+  }
 
   function toggleColumnGroup(group: Exclude<TaskGridColumnGroup, "basic">) {
     setColumnGroupVisibility((current) => ({ ...current, [group]: !current[group] }));
@@ -655,12 +683,232 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     if (target && Math.abs(target.scrollLeft - scrollLeft) > 1) target.scrollLeft = scrollLeft;
   }
 
-  function commitItems(next: ScheduleItem[] | ((current: ScheduleItem[]) => ScheduleItem[]), options: { description: string; mergeKey?: string }) {
+  const commitItems = useCallback((next: ScheduleItem[] | ((current: ScheduleItem[]) => ScheduleItem[]), options: { description: string; mergeKey?: string }) => {
     scheduleHistory.commit((current) => ({
       ...current,
       items: typeof next === "function" ? next(current.items) : next,
     }), options);
+  }, [scheduleHistory]);
+
+  function openTaskContextMenu(event: ReactMouseEvent<HTMLDivElement>, task: ScheduleItem) {
+    if (task.type !== "task") return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedItemId(task.id);
+    setTaskContextMenu({
+      taskId: task.id,
+      x: Math.max(4, Math.min(event.clientX, globalThis.innerWidth - 238)),
+      y: Math.max(4, Math.min(event.clientY, globalThis.innerHeight - 132)),
+    });
   }
+
+  function openTaskDetails(task: ScheduleItem) {
+    setSelectedItemId(task.id);
+    setTaskDetailMode("docked");
+    setTaskContextMenu(null);
+    globalThis.requestAnimationFrame(() => {
+      taskDetailNameInputRef.current?.focus();
+      taskDetailNameInputRef.current?.select();
+    });
+  }
+
+  function getTaskToGroupHierarchyValidation(task: ScheduleItem) {
+    const parent = itemById.get(task.parentId ?? "");
+    if (parent?.type !== "workItem") return "Chỉ có thể chuyển Công tác trực tiếp dưới Hạng mục thành Nhóm.";
+    return null;
+  }
+
+  async function convertTaskToGroup(task: ScheduleItem) {
+    const validationMessage = getTaskToGroupHierarchyValidation(task);
+    setTaskContextMenu(null);
+    if (validationMessage) {
+      onNotice(validationMessage);
+      return;
+    }
+    const hasRelations = dependencies.some((dependency) => dependency.predecessorTaskId === task.id || dependency.successorTaskId === task.id);
+    const hasTaskData = Boolean(task.unit || task.quantity != null || task.machineShiftCoefficient != null || task.machineCount != null || task.managedLabor != null || task.permanentLabor != null || task.allocation || task.nature || task.progress !== 0);
+    if ((hasRelations || hasTaskData) && !await commonDialog.confirm({
+      title: "Chuyển Công tác thành Nhóm",
+      message: `Công tác “${task.name}” có ${hasRelations ? "quan hệ công việc" : "dữ liệu nghiệp vụ riêng"}${hasRelations && hasTaskData ? " và dữ liệu nghiệp vụ riêng" : ""}.`,
+      detail: "Khi tiếp tục, các quan hệ công việc liên quan và dữ liệu chỉ dành cho Công tác sẽ bị xóa.",
+      confirmText: "Bỏ liên kết và chuyển",
+      tone: "warning",
+    })) return;
+
+    scheduleHistory.commit(
+      (current) => {
+        const converted = convertTaskToGroupWithFollowingTasks(current.items, task.id, (item) => ({
+          ...item,
+          type: "group",
+          unit: undefined,
+          quantity: undefined,
+          progress: 0,
+          machineShiftCoefficient: undefined,
+          machineCount: undefined,
+          managedLabor: undefined,
+          permanentLabor: undefined,
+          allocation: undefined,
+          nature: undefined,
+        }));
+        if (!converted) return current;
+        return {
+          items: recalculateScheduleWbs(converted),
+          dependencies: current.dependencies.filter((dependency) => dependency.predecessorTaskId !== task.id && dependency.successorTaskId !== task.id),
+        };
+      },
+      { description: `Chuyển ${task.wbs} · ${task.name} thành Nhóm` },
+    );
+    setSelectedItemId(task.id);
+    onNotice(`Đã chuyển “${task.name}” thành Nhóm`);
+  }
+
+  useEffect(() => {
+    if (!taskContextMenu) return;
+    function closeOnPointerDown(event: globalThis.PointerEvent) {
+      if (!(event.target as HTMLElement | null)?.closest(".task-context-menu")) setTaskContextMenu(null);
+    }
+    function closeOnEscape(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") setTaskContextMenu(null);
+    }
+    document.addEventListener("pointerdown", closeOnPointerDown);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnPointerDown);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [taskContextMenu]);
+
+  function startWbsDrag(event: ReactPointerEvent<HTMLDivElement>, item: ScheduleItem) {
+    if (event.button !== 0 || item.type === "project") return;
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const nextDrag = { sourceId: item.id, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, isActive: false };
+    wbsCaptureElementRef.current = event.currentTarget;
+    wbsDragRef.current = nextDrag;
+    wbsDropPreviewRef.current = null;
+    wbsSlotGeometriesRef.current = [];
+    setWbsDrag(nextDrag);
+    setSelectedItemId(item.id);
+  }
+
+  const refreshWbsSlotGeometries = useCallback((sourceId: string) => {
+    const pane = taskGridBodyScrollRef.current;
+    if (!pane) return [];
+    const rowElements = new Map<string, HTMLElement>();
+    pane.querySelectorAll<HTMLElement>("[data-wbs-row-id]").forEach((row) => {
+      if (row.dataset.wbsRowId) rowElements.set(row.dataset.wbsRowId, row);
+    });
+    const slots = buildTreeInsertionSlots(items, visibleItems.map((item) => item.id), sourceId);
+    const geometries = slots.flatMap<WbsSlotGeometry>((slot) => {
+      const row = rowElements.get(slot.lineItemId);
+      if (!row) return [];
+      const rowRect = row.getBoundingClientRect();
+      const nameCellRect = row.children.item(2)?.getBoundingClientRect();
+      return [{ ...slot, y: slot.lineEdge === "before" ? rowRect.top : rowRect.bottom, x: (nameCellRect?.left ?? rowRect.left) + 10 + slot.depth * 18 }];
+    });
+    wbsSlotGeometriesRef.current = geometries;
+    return geometries;
+  }, [items, visibleItems]);
+
+  useEffect(() => {
+    if (!wbsDrag) return;
+    function clearDrag() {
+      const currentDrag = wbsDragRef.current;
+      const captureElement = wbsCaptureElementRef.current;
+      if (currentDrag && captureElement?.hasPointerCapture(currentDrag.pointerId)) captureElement.releasePointerCapture(currentDrag.pointerId);
+      document.documentElement.classList.remove("wbs-reordering");
+      globalThis.getSelection()?.removeAllRanges();
+      wbsDragRef.current = null;
+      wbsDropPreviewRef.current = null;
+      wbsSlotGeometriesRef.current = [];
+      wbsCaptureElementRef.current = null;
+      if (wbsInsertionLineRef.current) wbsInsertionLineRef.current.style.display = "none";
+      setWbsDrag(null);
+    }
+    function renderInsertionLine(slot: WbsSlotGeometry | null) {
+      const line = wbsInsertionLineRef.current;
+      const paneRect = taskGridBodyScrollRef.current?.getBoundingClientRect();
+      if (!line || !slot || !paneRect) {
+        if (line) line.style.display = "none";
+        return;
+      }
+      line.style.display = "block";
+      line.style.left = `${paneRect.left}px`;
+      line.style.top = `${slot.y - 1}px`;
+      line.style.width = `${paneRect.width}px`;
+    }
+    function handlePointerMove(event: globalThis.PointerEvent) {
+      const currentDrag = wbsDragRef.current;
+      if (!currentDrag || event.pointerId !== currentDrag.pointerId) return;
+      const hasExceededThreshold = currentDrag.isActive || Math.hypot(event.clientX - currentDrag.startX, event.clientY - currentDrag.startY) >= 4;
+      if (!hasExceededThreshold) return;
+      event.preventDefault();
+      if (!currentDrag.isActive) {
+        const activeDrag = { ...currentDrag, isActive: true };
+        wbsDragRef.current = activeDrag;
+        setWbsDrag(activeDrag);
+        document.documentElement.classList.add("wbs-reordering");
+        refreshWbsSlotGeometries(currentDrag.sourceId);
+      }
+      const paneRect = taskGridBodyScrollRef.current?.getBoundingClientRect();
+      if (!paneRect || event.clientX < paneRect.left || event.clientX > paneRect.right || event.clientY < paneRect.top || event.clientY > paneRect.bottom) {
+        wbsDropPreviewRef.current = null;
+        renderInsertionLine(null);
+        return;
+      }
+      const geometries = wbsSlotGeometriesRef.current;
+      const closestY = Math.min(...geometries.map((slot) => Math.abs(slot.y - event.clientY)));
+      const verticalCandidates = geometries.filter((slot) => Math.abs(Math.abs(slot.y - event.clientY) - closestY) < .5);
+      const preview = closestY <= 22
+        ? verticalCandidates.reduce<WbsSlotGeometry | null>((closest, slot) => !closest || Math.abs(slot.x - event.clientX) < Math.abs(closest.x - event.clientX) ? slot : closest, null)
+        : null;
+      if (preview?.id === wbsDropPreviewRef.current?.id) return;
+      wbsDropPreviewRef.current = preview;
+      renderInsertionLine(preview);
+    }
+    function finishDrag(event: globalThis.PointerEvent) {
+      const currentDrag = wbsDragRef.current;
+      if (!currentDrag || event.pointerId !== currentDrag.pointerId) return;
+      const preview = wbsDropPreviewRef.current;
+      if (currentDrag.isActive && preview) {
+        const moved = moveTreeItemToSlot(items, currentDrag.sourceId, preview);
+        if (moved) {
+          const source = items.find((item) => item.id === currentDrag.sourceId);
+          commitItems(recalculateScheduleWbs(moved), { description: `Di chuyển ${source?.wbs ?? "dòng"} · ${source?.name ?? "WBS"}` });
+          setSelectedItemId(currentDrag.sourceId);
+          onNotice(`Đã di chuyển “${source?.name ?? "dòng WBS"}”`);
+        }
+      }
+      suppressWbsClickRef.current = currentDrag.isActive;
+      clearDrag();
+    }
+    function cancelDrag(event: globalThis.KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      clearDrag();
+    }
+    function refreshGeometry() {
+      const currentDrag = wbsDragRef.current;
+      if (currentDrag?.isActive) {
+        const geometries = refreshWbsSlotGeometries(currentDrag.sourceId);
+        const activeSlot = geometries.find((slot) => slot.id === wbsDropPreviewRef.current?.id) ?? null;
+        wbsDropPreviewRef.current = activeSlot;
+        renderInsertionLine(activeSlot);
+      }
+    }
+    document.addEventListener("pointermove", handlePointerMove, { passive: false });
+    document.addEventListener("pointerup", finishDrag);
+    document.addEventListener("pointercancel", clearDrag);
+    document.addEventListener("keydown", cancelDrag);
+    document.addEventListener("scroll", refreshGeometry, true);
+    return () => {
+      document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerup", finishDrag);
+      document.removeEventListener("pointercancel", clearDrag);
+      document.removeEventListener("keydown", cancelDrag);
+      document.removeEventListener("scroll", refreshGeometry, true);
+    };
+  }, [commitItems, items, onNotice, refreshWbsSlotGeometries, wbsDrag]);
 
   function createDependencyId() {
     return globalThis.crypto?.randomUUID?.() ?? `dependency-${Date.now()}`;
@@ -745,11 +993,18 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     onNotice(`Đã cập nhật quan hệ công việc của ${successor.name}`);
   }
 
-  function deleteSelectedDependency() {
+  async function deleteSelectedDependency() {
     const dependency = dependencies.find((item) => item.id === selectedDependencyId);
     if (!dependency) return;
     const predecessor = itemById.get(dependency.predecessorTaskId);
     const successor = itemById.get(dependency.successorTaskId);
+    if (!await commonDialog.confirm({
+      title: "Bỏ quan hệ công việc",
+      message: `Bỏ quan hệ ${dependency.dependencyType} giữa “${predecessor?.name ?? "Công tác trước"}” và “${successor?.name ?? "Công tác sau"}”?`,
+      detail: "Lịch tiến độ sẽ được tính lại sau khi bỏ quan hệ này.",
+      confirmText: "Bỏ liên kết",
+      tone: "warning",
+    })) return;
     scheduleHistory.commit((current) => {
       const nextDependencies = current.dependencies.filter((item) => item.id !== dependency.id);
       const hasRemainingPredecessor = nextDependencies.some((item) => item.successorTaskId === dependency.successorTaskId);
@@ -766,168 +1021,6 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     onNotice("Đã xóa quan hệ công việc");
   }
 
-  function getBranchRange(targetId: string) {
-    const startIndex = items.findIndex((item) => item.id === targetId);
-    if (startIndex < 0) return null;
-    let endIndex = startIndex + 1;
-    while (endIndex < items.length && isScheduleDescendant(items[endIndex], targetId, itemById)) endIndex += 1;
-    return { startIndex, endIndex };
-  }
-
-  function findVerticalTarget(target: ScheduleItem, direction: "up" | "down") {
-    const targetIndex = items.indexOf(target);
-    if (direction === "up") {
-      for (let index = targetIndex - 1; index >= 0; index -= 1) {
-        const candidate = items[index];
-        if (candidate.projectId !== target.projectId) break;
-        if (candidate.type === target.type) return candidate;
-      }
-      return null;
-    }
-    const range = getBranchRange(target.id);
-    if (!range) return null;
-    for (let index = range.endIndex; index < items.length; index += 1) {
-      const candidate = items[index];
-      if (candidate.projectId !== target.projectId) break;
-      if (candidate.type === target.type) return candidate;
-    }
-    return null;
-  }
-
-  function findPreviousSibling(target: ScheduleItem) {
-    const targetIndex = items.indexOf(target);
-    for (let index = targetIndex - 1; index >= 0; index -= 1) {
-      const candidate = items[index];
-      if (candidate.projectId !== target.projectId) break;
-      if (candidate.parentId === target.parentId && candidate.type === target.type) return candidate;
-    }
-    return null;
-  }
-
-  function canOutdent(target: ScheduleItem) {
-    return target.type === "group" || target.type === "task";
-  }
-
-  function canIndent(target: ScheduleItem) {
-    if (target.type === "project" || target.type === "task" || !findPreviousSibling(target)) return false;
-    const range = getBranchRange(target.id);
-    if (!range) return false;
-    return !items.slice(range.startIndex, range.endIndex).some((item) => item.type === "task");
-  }
-
-  function moveScheduleItem(target: ScheduleItem, direction: "up" | "down") {
-    const candidate = findVerticalTarget(target, direction);
-    const targetRange = getBranchRange(target.id);
-    if (!candidate || !targetRange || target.type === "project") {
-      onNotice(`Không thể dịch ${direction === "up" ? "lên" : "xuống"} dòng này trong phạm vi dự án`);
-      return;
-    }
-    const movingBranch = items.slice(targetRange.startIndex, targetRange.endIndex).map((item, index) => index === 0 ? { ...item, parentId: candidate.parentId } : item);
-    const remainingItems = [...items.slice(0, targetRange.startIndex), ...items.slice(targetRange.endIndex)];
-    let insertIndex: number;
-    if (direction === "up") {
-      insertIndex = remainingItems.findIndex((item) => item.id === candidate.id);
-    } else {
-      const remainingMap = new Map(remainingItems.map((item) => [item.id, item]));
-      const candidateIndex = remainingItems.findIndex((item) => item.id === candidate.id);
-      insertIndex = candidateIndex + 1;
-      while (insertIndex < remainingItems.length && isScheduleDescendant(remainingItems[insertIndex], candidate.id, remainingMap)) insertIndex += 1;
-    }
-    const nextItems = recalculateScheduleWbs([
-      ...remainingItems.slice(0, insertIndex),
-      ...movingBranch,
-      ...remainingItems.slice(insertIndex),
-    ]);
-    commitItems(nextItems, { description: `Dịch ${target.wbs} ${direction === "up" ? "lên" : "xuống"}` });
-    setSelectedItemId(target.id);
-    onNotice(`Đã dịch “${target.name}” ${direction === "up" ? "lên" : "xuống"}`);
-  }
-
-  function outdentScheduleItem(target: ScheduleItem) {
-    if (!canOutdent(target)) {
-      onNotice("Hạng mục không thể giảm tiếp thành cấp dự án");
-      return;
-    }
-    const targetRange = getBranchRange(target.id);
-    const oldParent = itemById.get(target.parentId ?? "");
-    if (!targetRange || !oldParent) return;
-    const transformedBranch = items.slice(targetRange.startIndex, targetRange.endIndex).map((item, index) => ({
-      ...item,
-      type: scheduleTypeByDepth[scheduleDepth[item.type] - 1],
-      parentId: index === 0 ? oldParent.parentId : item.parentId,
-    }));
-    const remainingItems = [...items.slice(0, targetRange.startIndex), ...items.slice(targetRange.endIndex)];
-    const remainingMap = new Map(remainingItems.map((item) => [item.id, item]));
-    let insertIndex = remainingItems.findIndex((item) => item.id === oldParent.id) + 1;
-    while (insertIndex < remainingItems.length && isScheduleDescendant(remainingItems[insertIndex], oldParent.id, remainingMap)) insertIndex += 1;
-    const nextItems = recalculateScheduleWbs([
-      ...remainingItems.slice(0, insertIndex),
-      ...transformedBranch,
-      ...remainingItems.slice(insertIndex),
-    ]);
-    commitItems(nextItems, { description: `Giảm cấp ${target.wbs} · ${target.name}` });
-    setSelectedItemId(target.id);
-    onNotice(`Đã chuyển “${target.name}” thành ${target.type === "task" ? "Nhóm công việc" : "Hạng mục"}`);
-  }
-
-  function indentScheduleItem(target: ScheduleItem) {
-    const previousSibling = findPreviousSibling(target);
-    const targetRange = getBranchRange(target.id);
-    if (!previousSibling || !targetRange || !canIndent(target)) {
-      onNotice("Không có dòng cùng cấp phía trên phù hợp hoặc nhánh sẽ vượt quá cấp Công tác");
-      return;
-    }
-    const transformedBranch = items.slice(targetRange.startIndex, targetRange.endIndex).map((item, index) => ({
-      ...item,
-      type: scheduleTypeByDepth[scheduleDepth[item.type] + 1],
-      parentId: index === 0 ? previousSibling.id : item.parentId,
-    }));
-    const nextItems = recalculateScheduleWbs([
-      ...items.slice(0, targetRange.startIndex),
-      ...transformedBranch,
-      ...items.slice(targetRange.endIndex),
-    ]);
-    commitItems(nextItems, { description: `Tăng cấp ${target.wbs} · ${target.name}` });
-    setSelectedItemId(target.id);
-    onNotice(`Đã chuyển “${target.name}” thành ${target.type === "workItem" ? "Nhóm công việc" : "Công tác"}`);
-  }
-
-  useEffect(() => {
-    if (!deleteTargetId) return;
-    cancelDeleteButtonRef.current?.focus();
-    function handleKeyDown(event: globalThis.KeyboardEvent) {
-      const shortcut = event.key.toLocaleLowerCase();
-      if (event.altKey && shortcut === "h") {
-        event.preventDefault();
-        setDeleteTargetId(null);
-        return;
-      }
-      if (event.altKey && shortcut === "x") {
-        event.preventDefault();
-        confirmDeleteButtonRef.current?.click();
-        return;
-      }
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setDeleteTargetId(null);
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const focusableElements = Array.from(deleteDialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled])") ?? []);
-      if (!focusableElements.length) return;
-      const firstElement = focusableElements[0];
-      const lastElement = focusableElements[focusableElements.length - 1];
-      if (event.shiftKey && document.activeElement === firstElement) {
-        event.preventDefault();
-        lastElement.focus();
-      } else if (!event.shiftKey && document.activeElement === lastElement) {
-        event.preventDefault();
-        firstElement.focus();
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [deleteTargetId]);
 
   useEffect(() => {
     function handleHistoryShortcut(event: globalThis.KeyboardEvent) {
@@ -1031,7 +1124,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
     function handlePointerMove(pointerEvent: globalThis.PointerEvent) {
-      setTaskNameColumnWidth(Math.max(415, Math.min(915, startWidth + pointerEvent.clientX - startX)));
+      setTaskNameColumnWidth(Math.max(minimumTaskNameColumnWidth, Math.min(915, startWidth + pointerEvent.clientX - startX)));
     }
     function finishResize() {
       document.body.style.cursor = previousCursor;
@@ -1139,19 +1232,48 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     onNotice(`Đã chèn “${insertedItem.name}” ${position === "before" ? "phía trên" : "phía dưới"} dòng hiện tại`);
   }
 
-  function deleteItem(targetItem?: ScheduleItem) {
+  function addChildItem(parent: ScheduleItem) {
+    if (parent.type !== "project" && parent.type !== "workItem" && parent.type !== "group") return;
+    const itemType: ScheduleItemType = parent.type === "project" ? "workItem" : "task";
+    const itemName = itemType === "workItem" ? "Hạng mục mới" : "Công tác mới";
+    const newItem: ScheduleItem = {
+      // ID is generated only when the user clicks an action button.
+      id: `task-${Date.now()}`,
+      projectId: parent.projectId,
+      parentId: parent.id,
+      type: itemType,
+      wbs: "",
+      name: itemName,
+      duration: 5,
+      startDate: "03/09/26",
+      finishDate: "07/09/26",
+      progress: 0,
+      ganttLeft: 44,
+      ganttWidth: 10,
+    };
+    let insertIndex = items.indexOf(parent) + 1;
+    while (insertIndex < items.length && isScheduleDescendant(items[insertIndex], parent.id, itemById)) insertIndex += 1;
+    const nextItems = recalculateScheduleWbs([
+      ...items.slice(0, insertIndex),
+      newItem,
+      ...items.slice(insertIndex),
+    ]);
+    commitItems(nextItems, { description: `${itemType === "workItem" ? "Thêm hạng mục" : "Thêm công tác con"} · ${parent.name}` });
+    setCollapsedIds((current) => {
+      if (!current.has(parent.id)) return current;
+      const next = new Set(current);
+      next.delete(parent.id);
+      return next;
+    });
+    setSelectedItemId(newItem.id);
+    setAutoEditItemId(newItem.id);
+    onNotice(`Đã thêm “${newItem.name}” vào “${parent.name}”`);
+  }
+
+  async function deleteItem(targetItem?: ScheduleItem) {
     const target = targetItem ?? selectedItem;
     if (!target || target.type === "project") {
       onNotice("Không xóa dự án tại màn hình tiến độ");
-      return;
-    }
-    setDeleteTargetId(target.id);
-  }
-
-  function confirmDeleteItem() {
-    const target = items.find((item) => item.id === deleteTargetId);
-    if (!target) {
-      setDeleteTargetId(null);
       return;
     }
     const idsToDelete = new Set([target.id]);
@@ -1165,6 +1287,13 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
         }
       });
     }
+    if (!await commonDialog.confirm({
+      title: "Xóa dòng tiến độ",
+      message: `Xóa “${target.name}” khỏi kế hoạch tiến độ?`,
+      detail: idsToDelete.size > 1 ? `Toàn bộ ${idsToDelete.size - 1} dòng con và các quan hệ công việc liên quan cũng sẽ bị xóa.` : "Các quan hệ công việc liên quan cũng sẽ bị xóa.",
+      confirmText: "Xóa",
+      tone: "danger",
+    })) return;
     scheduleHistory.commit(
       (current) => ({
         items: current.items.filter((item) => !idsToDelete.has(item.id)),
@@ -1173,7 +1302,6 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       { description: `Xóa ${target.wbs} · ${target.name}${idsToDelete.size > 1 ? ` và ${idsToDelete.size - 1} dòng con` : ""}` },
     );
     setSelectedItemId(target.parentId ?? visibleItems[0]?.id ?? "");
-    setDeleteTargetId(null);
     onNotice(`Đã xóa “${target.name}” khỏi dữ liệu nháp tiến độ`);
   }
 
@@ -1188,13 +1316,13 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     const left = Math.max(0, differenceInCalendarDays(startDate, timeline.startDate) / ganttDayStep * ganttColumnWidth);
     const durationDays = Math.max(1, differenceInCalendarDays(finishDate, startDate) + 1);
     const width = Math.max(4, durationDays / ganttDayStep * ganttColumnWidth);
-    return { left, width, y: rowIndex * 35 + 17.5 };
+    return { left, width, y: rowIndex * scheduleRowHeight + scheduleRowHeight / 2 };
   }
 
   function startDependencyDrag(event: ReactPointerEvent<HTMLSpanElement>, task: ScheduleItem, barLeft: number, barWidth: number, rowIndex: number) {
     event.preventDefault();
     event.stopPropagation();
-    const sourcePoint = { x: barLeft + barWidth, y: rowIndex * 35 + 17.5 };
+    const sourcePoint = { x: barLeft + barWidth, y: rowIndex * scheduleRowHeight + scheduleRowHeight / 2 };
     setSelectedItemId(task.id);
     setSelectedDependencyId(null);
     setDependencyDrag({ sourceTaskId: task.id, sourcePoint, pointerPosition: sourcePoint, initialPointerPosition: { x: event.clientX, y: event.clientY }, hasExceededThreshold: false });
@@ -1227,7 +1355,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
         <button className="button" onClick={() => onNotice("Lịch làm việc sẽ quản lý ngày nghỉ, ca và ngoại lệ")}>▣ Lịch làm việc</button>
         <label className="gantt-step-control"><span>Cách nhau:</span><input type="number" min="1" max="365" value={ganttDayStep} aria-label="Số ngày trong một cột Gantt" onChange={(event) => setGanttDayStep(Math.max(1, Math.min(365, Math.trunc(Number(event.target.value) || 1))))} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} /><small>ngày</small></label>
         <button className="button secondary" onClick={() => onNotice("Lịch sử thay đổi sẽ được kết nối sau")}>◷ Lịch sử</button>
-        <button className="button primary" onClick={() => onNotice("Đã lưu dữ liệu tiến độ nháp trên phiên làm việc")}>▣ Lưu thay đổi</button>
+        <button className="button primary" disabled={scheduleSaving || scheduleLoading} onClick={saveSchedule}>▣ {scheduleSaving ? "Đang lưu..." : "Lưu thay đổi"}</button>
       </div>
     </div>
 
@@ -1267,7 +1395,8 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       </div>
 
       <div className="schedule-board-body">
-      <div ref={taskGridBodyScrollRef} className="schedule-table-pane" onScroll={(event) => syncTaskGridHorizontalScroll(event.currentTarget.scrollLeft, "body")}>
+      <div ref={taskGridBodyScrollRef} className="schedule-table-pane" onScroll={(event) => { syncTaskGridHorizontalScroll(event.currentTarget.scrollLeft, "body"); setTaskContextMenu(null); }}>
+        <div ref={wbsInsertionLineRef} className="wbs-insertion-line" aria-hidden="true" />
         <div className="schedule-rows">
           {visibleItems.map((item) => {
             const isSelected = item.id === selectedItem?.id;
@@ -1280,16 +1409,18 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
               const lagText = dependency.lag ? ` ${dependency.lag > 0 ? "+" : ""}${dependency.lag} ngày` : "";
               return `${scheduleOrder.get(dependency.predecessorTaskId) ?? "?"} — ${predecessor?.name ?? "Không tìm thấy công tác"} — ${dependency.dependencyType}${lagText}`;
             }).join("\n");
-            return <div key={item.id} className={`schedule-table-grid schedule-row row-${item.type} ${isSelected ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => setSelectedItemId(item.id)} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) setSelectedItemId(item.id); }}>
-              <div className="wbs-cell" title={`WBS: ${item.wbs}`}>{scheduleOrder.get(item.id)}</div>
+            return <div key={item.id} data-wbs-row-id={item.id} className={`schedule-table-grid schedule-row row-${item.type} ${isSelected ? "selected" : ""} ${wbsDrag?.sourceId === item.id && wbsDrag.isActive ? "wbs-drag-source" : ""}`} role="button" tabIndex={0} onClick={() => { if (suppressWbsClickRef.current) { suppressWbsClickRef.current = false; return; } setSelectedItemId(item.id); }} onContextMenu={(event) => openTaskContextMenu(event, item)} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) setSelectedItemId(item.id); }}>
+              <div className={`wbs-cell ${item.type === "project" ? "" : "wbs-drag-cell"}`} aria-label={item.type === "project" ? undefined : "Kéo để sắp xếp"} title={item.type === "project" ? `WBS: ${item.wbs}` : `STT ${scheduleOrder.get(item.id)} · Kéo để sắp xếp`} onPointerDown={(event) => startWbsDrag(event, item)}>{scheduleOrder.get(item.id)}</div>
               <div className="row-actions">
-                <button title="Dịch lên" disabled={item.type === "project" || !findVerticalTarget(item, "up")} onClick={() => moveScheduleItem(item, "up")}>↑</button><button title="Dịch xuống" disabled={item.type === "project" || !findVerticalTarget(item, "down")} onClick={() => moveScheduleItem(item, "down")}>↓</button><button title="Giảm cấp" disabled={!canOutdent(item)} onClick={() => outdentScheduleItem(item)}>←</button><button title="Tăng cấp" disabled={!canIndent(item)} onClick={() => indentScheduleItem(item)}>→</button><button aria-label="Chèn phía trên" title="Chèn phía trên" onClick={() => insertScheduleItem(item, "before")}>↥</button><button aria-label="Chèn phía dưới" title="Chèn phía dưới" onClick={() => insertScheduleItem(item, "after")}>↧</button><button title="Xóa" disabled={item.type === "project"} onClick={() => deleteItem(item)}>⌫</button>
+                {item.type === "project"
+                  ? <button className="action-slot-add" aria-label="Thêm hạng mục" title="Thêm hạng mục" onClick={() => addChildItem(item)}>+</button>
+                  : <>{(item.type === "workItem" || item.type === "group") && <button className="action-slot-add" aria-label="Thêm công tác" title="Thêm công tác" onClick={() => addChildItem(item)}>+</button>}<button className="action-slot-insert-above" aria-label="Chèn lên trên" title="Chèn lên trên" onClick={() => insertScheduleItem(item, "before")}><span className="action-triangle">▲</span></button><button className="action-slot-insert-below" aria-label="Chèn xuống dưới" title="Chèn xuống dưới" onClick={() => insertScheduleItem(item, "after")}><span className="action-triangle">▼</span></button><button className="action-slot-delete" aria-label="Xóa" title="Xóa" onClick={() => deleteItem(item)}><svg className="action-trash-icon" aria-hidden="true" viewBox="0 0 16 16"><path d="M5 5v7m3-7v7m3-7v7M3.5 3.5h9l-.6 10h-7.8l-.6-10ZM6 3.5V2h4v1.5M2.5 3.5h11" /></svg></button></>}
               </div>
-              <div className="task-name" style={{ paddingLeft: `${10 + scheduleDepth[item.type] * 18}px` }}>
+              <div className="task-name" style={{ paddingLeft: `${10 + getScheduleTreeDepth(item, itemById) * 18}px` }}>
                 {expandable ? <button className="tree-toggle" onClick={(event) => { event.stopPropagation(); toggleCollapse(item.id); }}>{collapsedIds.has(item.id) ? "›" : "⌄"}</button> : <span className="tree-spacer" />}
                 <InlineNameEditor value={item.name} autoEdit={autoEditItemId === item.id} onCommit={(name) => { setAutoEditItemId(null); setSelectedItemId(item.id); commitItems((current) => current.map((currentItem) => currentItem.id === item.id ? { ...currentItem, name } : currentItem), { description: `Đổi tên ${item.wbs} thành “${name}”` }); onNotice(`Đã đổi tên ${item.wbs}`); }} />{item.nature && <small>{item.nature}</small>}
               </div>
-              {columnGroupVisibility.progress && <>{item.type === "task" ? <><div className="duration-cell"><input aria-label={`Thời lượng ${item.name}`} type="number" min="1" value={item.duration} onFocus={() => setSelectedItemId(item.id)} onChange={(event) => updateDuration(item, Number(event.target.value))} onKeyDown={(event) => { event.stopPropagation(); if (event.key === "Enter") event.currentTarget.blur(); }} /><span>ngày</span></div>
+              {columnGroupVisibility.progress && <>{item.type === "task" ? <><div className="duration-cell"><input aria-label={`Thời lượng ${item.name}`} type="number" min="1" value={item.duration} onFocus={() => setSelectedItemId(item.id)} onChange={(event) => updateDuration(item, Number(event.target.value))} onKeyDown={(event) => { event.stopPropagation(); if (event.key === "Enter") event.currentTarget.blur(); }} /><span>n</span></div>
               <div className="date-cell"><InlineDateEditor key={`${item.id}-start-${item.startDate}`} label={`Ngày bắt đầu ${item.name}`} value={item.startDate} onCommit={(value) => { setSelectedItemId(item.id); return updateScheduleDate(item, "startDate", value); }} onInvalid={() => onNotice("Ngày bắt đầu phải đúng định dạng dd/MM/yy")} /></div>
               <div className="date-cell"><InlineDateEditor key={`${item.id}-finish-${item.finishDate}`} label={`Ngày kết thúc ${item.name}`} value={item.finishDate} onCommit={(value) => { setSelectedItemId(item.id); return updateScheduleDate(item, "finishDate", value); }} onInvalid={() => onNotice("Ngày kết thúc phải đúng định dạng dd/MM/yy")} /></div></> : <><div className="duration-cell summary-value"><span>{derivedDates?.duration ?? "—"} {derivedDates ? "ngày" : ""}</span></div><div className="date-cell summary-value"><span>{derivedDates?.startDate ?? "—"}</span></div><div className="date-cell summary-value"><span>{derivedDates?.finishDate ?? "—"}</span></div></>}
               <div className={`predecessor-cell ${item.type === "task" ? "editable" : ""}`} title={predecessorTooltip || "Không có công tác trước"} onDoubleClick={() => openDependencyEditor(item)}><span>{item.type === "task" ? predecessorText : "—"}</span></div>
@@ -1310,7 +1441,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
           if (header && Math.abs(header.scrollLeft - event.currentTarget.scrollLeft) > 1) header.scrollLeft = event.currentTarget.scrollLeft;
         }}>
           {timeline ? <div ref={ganttContentRef} className="gantt-content" style={{ width: timeline.width }}>
-            <svg className="gantt-dependency-layer" width={timeline.width} height={visibleItems.length * 35} aria-label="Quan hệ công việc trên Gantt">
+            <svg className="gantt-dependency-layer" width={timeline.width} height={visibleItems.length * scheduleRowHeight} aria-label="Quan hệ công việc trên Gantt">
               <defs><marker id="dependency-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" /></marker></defs>
               {dependencies.map((dependency) => {
                 const source = getTaskBarGeometry(dependency.predecessorTaskId);
@@ -1368,7 +1499,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       <div className="task-detail-form">
         <h3>Chi tiết công việc</h3>
         <div className="task-detail-grid">
-          <label><span>Tên công việc</span><input value={selectedItem.name} onChange={(event) => updateSelected({ name: event.target.value })} /></label>
+          <label><span>Tên công việc</span><input ref={taskDetailNameInputRef} value={selectedItem.name} onChange={(event) => updateSelected({ name: event.target.value })} /></label>
           <label><span>Thời lượng</span><input type="number" min="1" disabled={selectedItem.type !== "task"} value={selectedSummaryDates?.duration ?? selectedItem.duration} onChange={(event) => updateDuration(selectedItem, Number(event.target.value))} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} /></label>
           <label><span>Bắt đầu</span><input disabled={selectedItem.type !== "task"} value={selectedSummaryDates?.startDate ?? selectedItem.startDate} onChange={(event) => updateSelected({ startDate: event.target.value })} /></label>
           <label><span>Kết thúc</span><input disabled={selectedItem.type !== "task"} value={selectedSummaryDates?.finishDate ?? selectedItem.finishDate} onChange={(event) => updateSelected({ finishDate: event.target.value })} /></label>
@@ -1378,6 +1509,13 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
         <div><h3>Khối lượng dự toán đã phân bổ</h3>{selectedItem.allocation ? <><strong>{selectedItem.allocation.code} · {selectedItem.allocation.name}</strong><small>{formatCurrency(selectedItem.allocation.allocated)} / {formatCurrency(selectedItem.allocation.total)} {selectedItem.allocation.unit} · DT-03</small></> : <small>Chưa phân bổ BOQ cho dòng đang chọn.</small>}</div>
         {selectedItem.allocation && <div className="allocation-progress"><span><i style={{ width: `${Math.min(100, selectedItem.allocation.allocated / selectedItem.allocation.total * 100)}%` }} /></span><b>{Math.round(selectedItem.allocation.allocated / selectedItem.allocation.total * 100)}%</b></div>}
       </div>
+    </div>}
+
+    {taskContextMenu && contextTask && <div className="task-context-menu" role="menu" aria-label={`Tác vụ cho ${contextTask.name}`} style={{ left: taskContextMenu.x, top: taskContextMenu.y }}>
+      <button type="button" role="menuitem" onClick={() => openTaskDetails(contextTask)}>Xem / sửa thông tin công tác</button>
+      <button type="button" role="menuitem" onClick={() => convertTaskToGroup(contextTask)}>Chuyển công tác thành Nhóm</button>
+      <div className="task-context-separator" role="separator" />
+      <button type="button" role="menuitem" onClick={() => { setTaskContextMenu(null); deleteItem(contextTask); }}>Xóa công tác</button>
     </div>}
 
     {dependencyEditorTask && <div className="dependency-editor-backdrop">
@@ -1404,64 +1542,37 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       </section>
     </div>}
 
-    {deleteTarget && <div className="confirm-backdrop">
-      <div ref={deleteDialogRef} className="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description">
-        <header className="confirm-caption">
-          <div><span className="confirm-caption-icon">⌫</span><strong id="delete-dialog-title">Xóa dòng tiến độ</strong></div>
-          <button type="button" className="confirm-close" onClick={() => setDeleteTargetId(null)} aria-label="Đóng cửa sổ">×</button>
-        </header>
-        <div className="confirm-content">
-          <div className="delete-symbol" aria-hidden="true">⌫</div>
-          <div>
-            <h3>Xóa “{deleteTarget.name}”?</h3>
-            <p id="delete-dialog-description">Dòng <strong>{deleteTarget.wbs}</strong> sẽ bị xóa khỏi kế hoạch tiến độ.{deleteChildCount > 0 ? ` Toàn bộ ${deleteChildCount} dòng con cũng sẽ bị xóa.` : ""}</p>
-            <small>Thao tác này đang áp dụng trên dữ liệu nháp và chưa gửi lên cơ sở dữ liệu.</small>
-          </div>
-        </div>
-        <footer className="confirm-actions">
-          <button ref={cancelDeleteButtonRef} type="button" className="button secondary" title="Phím tắt: Alt + H" onClick={() => setDeleteTargetId(null)}>Hủy bỏ</button>
-          <button ref={confirmDeleteButtonRef} type="button" className="button primary" title="Phím tắt: Alt + X" onClick={confirmDeleteItem}>⌫ Xóa</button>
-        </footer>
-      </div>
-    </div>}
+    {commonDialog.dialog}
 
   </section>;
 }
 
 export default function Home() {
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [storageReady, setStorageReady] = useState(false);
+  const commonDialog = useCommonDialog();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeMenu, setActiveMenu] = useState("projects");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"Tất cả" | ProjectStatus>("Tất cả");
-  const [selectedId, setSelectedId] = useState(initialProjects[0].id);
+  const [selectedId, setSelectedId] = useState("");
   const [modalMode, setModalMode] = useState<"create" | "edit" | null>(null);
   const [draft, setDraft] = useState(blankProject);
-  const [notice, setNotice] = useState("Dữ liệu mẫu đã sẵn sàng để thao tác");
+  const [notice, setNotice] = useState("Đang kết nối cơ sở dữ liệu...");
 
-  useEffect(() => {
-    const saved = globalThis.localStorage?.getItem(storageKey);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as Project[];
-        if (Array.isArray(parsed) && parsed.length) {
-          globalThis.queueMicrotask(() => {
-            setProjects(parsed);
-            setStorageReady(true);
-          });
-          return;
-        }
-      } catch {
-        globalThis.localStorage?.removeItem(storageKey);
-      }
-    }
-    globalThis.queueMicrotask(() => setStorageReady(true));
-  }, []);
+  async function loadProjects() {
+    setProjectsLoading(true);
+    try {
+      const loaded = await requestApi<Project[]>("/api/projects");
+      setProjects(loaded);
+      setSelectedId((current) => loaded.some((project) => project.id === current) ? current : loaded[0]?.id ?? "");
+      setNotice("Đã tải dữ liệu dự án từ cơ sở dữ liệu");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Không thể tải danh sách dự án");
+    } finally { setProjectsLoading(false); }
+  }
 
-  useEffect(() => {
-    if (storageReady) globalThis.localStorage?.setItem(storageKey, JSON.stringify(projects));
-  }, [projects, storageReady]);
+  useEffect(() => { globalThis.queueMicrotask(() => void loadProjects()); }, []);
 
   const selectedProject = projects.find((project) => project.id === selectedId) ?? projects[0];
   const visibleCount = projects.filter((project) => project.visible).length;
@@ -1480,9 +1591,14 @@ export default function Home() {
   const totalBudget = projects.reduce((sum, project) => sum + project.budget, 0);
   const activeCount = projects.filter((project) => project.status === "Đang thực hiện").length;
 
-  function toggleVisibility(projectId: string) {
-    setProjects((current) => current.map((project) => project.id === projectId ? { ...project, visible: !project.visible } : project));
-    setNotice("Đã cập nhật phạm vi dự án hiển thị trên các phân hệ");
+  async function toggleVisibility(projectId: string) {
+    const project = projects.find((item) => item.id === projectId);
+    if (!project) return;
+    try {
+      const saved = await requestApi<Project>(`/api/projects/${projectId}`, { method: "PATCH", body: JSON.stringify({ ...project, visible: !project.visible }) });
+      setProjects((current) => current.map((item) => item.id === projectId ? saved : item));
+      setNotice("Đã cập nhật phạm vi dự án trong cơ sở dữ liệu");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Không thể cập nhật dự án"); }
   }
 
   function openCreate() {
@@ -1508,62 +1624,69 @@ export default function Home() {
     setModalMode("edit");
   }
 
-  function saveProject(event: FormEvent<HTMLFormElement>) {
+  async function saveProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.code.trim() || !draft.name.trim()) return;
-    if (modalMode === "create") {
-      const project: Project = {
-        ...draft,
-        id: `prj-${Date.now()}`,
-        code: draft.code.trim().toUpperCase(),
-        name: draft.name.trim(),
-        updatedAt: todayLabel(),
-      };
-      setProjects((current) => [project, ...current]);
-      setSelectedId(project.id);
-      setNotice(`Đã tạo ${project.name}`);
-    } else if (selectedProject) {
-      setProjects((current) => current.map((project) => project.id === selectedProject.id ? {
-        ...project,
-        ...draft,
-        code: draft.code.trim().toUpperCase(),
-        name: draft.name.trim(),
-        updatedAt: todayLabel(),
-      } : project));
-      setNotice(`Đã cập nhật ${draft.name}`);
-    }
-    setModalMode(null);
+    try {
+      if (modalMode === "create") {
+        const project = await requestApi<Project>("/api/projects", { method: "POST", body: JSON.stringify(draft) });
+        setProjects((current) => [project, ...current]);
+        setSelectedId(project.id);
+        setNotice(`Đã tạo và lưu ${project.name}`);
+      } else if (selectedProject) {
+        const project = await requestApi<Project>(`/api/projects/${selectedProject.id}`, { method: "PATCH", body: JSON.stringify(draft) });
+        setProjects((current) => current.map((item) => item.id === project.id ? project : item));
+        setNotice(`Đã cập nhật ${project.name}`);
+      }
+      setModalMode(null);
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Không thể lưu dự án"); }
   }
 
-  function duplicateProject(project: Project) {
-    const copy: Project = {
+  async function duplicateProject(project: Project) {
+    const copy: ProjectInput = {
       ...project,
-      id: `prj-${Date.now()}`,
       code: `${project.code}-CP`,
       name: `${project.name} — Bản sao`,
       status: "Chuẩn bị",
       progress: 0,
       visible: false,
-      updatedAt: todayLabel(),
     };
-    setProjects((current) => [copy, ...current]);
-    setSelectedId(copy.id);
-    setNotice("Đã nhân bản dự án; bản sao đang ở trạng thái Chuẩn bị");
+    try {
+      const saved = await requestApi<Project>("/api/projects", { method: "POST", body: JSON.stringify(copy) });
+      setProjects((current) => [saved, ...current]); setSelectedId(saved.id);
+      setNotice("Đã nhân bản dự án vào cơ sở dữ liệu");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Không thể nhân bản dự án"); }
   }
 
-  function archiveProject(project: Project) {
-    if (!globalThis.confirm(`Chuyển “${project.name}” sang trạng thái Hoàn thành?`)) return;
-    setProjects((current) => current.map((item) => item.id === project.id ? { ...item, status: "Hoàn thành", visible: false, updatedAt: todayLabel() } : item));
-    setNotice("Đã hoàn thành và bỏ dự án khỏi phạm vi hiển thị");
+  async function archiveProject(project: Project) {
+    if (!await commonDialog.confirm({
+      title: "Hoàn thành dự án",
+      message: `Chuyển “${project.name}” sang trạng thái Hoàn thành?`,
+      detail: "Dự án sẽ được bỏ khỏi phạm vi hiển thị hiện tại.",
+      confirmText: "Hoàn thành",
+      tone: "warning",
+    })) return;
+    try {
+      const saved = await requestApi<Project>(`/api/projects/${project.id}`, { method: "PATCH", body: JSON.stringify({ ...project, status: "Hoàn thành", visible: false }) });
+      setProjects((current) => current.map((item) => item.id === project.id ? saved : item));
+      setNotice("Đã hoàn thành và lưu trạng thái dự án");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Không thể cập nhật dự án"); }
   }
 
-  function resetDemo() {
-    if (!globalThis.confirm("Khôi phục toàn bộ dữ liệu dự án mẫu ban đầu?")) return;
-    setProjects(initialProjects);
-    setSelectedId(initialProjects[0].id);
-    setQuery("");
-    setStatusFilter("Tất cả");
-    setNotice("Đã khôi phục dữ liệu mẫu");
+  async function removeProject(project: Project) {
+    if (!await commonDialog.confirm({
+      title: "Xóa dự án",
+      message: `Xóa dự án “${project.name}”?`,
+      detail: "Toàn bộ cây WBS và các quan hệ công việc của dự án cũng sẽ bị xóa. Thao tác này không thể hoàn tác sau khi lưu.",
+      confirmText: "Xóa dự án",
+      tone: "danger",
+    })) return;
+    try {
+      await requestApi<void>(`/api/projects/${project.id}`, { method: "DELETE" });
+      const remaining = projects.filter((item) => item.id !== project.id);
+      setProjects(remaining); setSelectedId(remaining[0]?.id ?? "");
+      setNotice("Đã xóa dự án và toàn bộ cây WBS");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Không thể xóa dự án"); }
   }
 
   return (
@@ -1591,7 +1714,7 @@ export default function Home() {
         {activeMenu !== "schedule" && <header className="topbar">
           {activeMenu === "projects" ? <>
             <div><p>Danh mục dự án</p><h1>Quản lý dự án</h1></div>
-            <div className="topbar-actions"><button className="button secondary" onClick={resetDemo}>Khôi phục dữ liệu mẫu</button><button className="button primary" onClick={openCreate}><span>＋</span> Tạo dự án</button></div>
+            <div className="topbar-actions"><button className="button secondary" disabled={projectsLoading} onClick={loadProjects}>Làm mới</button><button className="button primary" onClick={openCreate}><span>＋</span> Tạo dự án</button></div>
           </> : <>
             <div><p>Phân hệ AlphaPMS</p><h1>{menuItems.find(([id]) => id === activeMenu)?.[2]}</h1></div>
           </>}
@@ -1628,17 +1751,19 @@ export default function Home() {
 
             {selectedProject && <aside className="detail-pane">
               <div className="detail-head"><div className="project-avatar">{selectedProject.code.slice(0, 2)}</div><div><span>{selectedProject.code}</span><h2>{selectedProject.name}</h2></div><span className="grow" /><button className="icon-button" onClick={() => openEdit(selectedProject)} aria-label="Sửa dự án">✎</button></div>
-              <div className="detail-actions"><button className="button primary" onClick={() => openEdit(selectedProject)}>Chỉnh sửa</button><button className="button secondary" onClick={() => duplicateProject(selectedProject)}>Nhân bản</button><button className="button secondary" onClick={() => archiveProject(selectedProject)}>Hoàn thành</button></div>
+              <div className="detail-actions"><button className="button primary" onClick={() => openEdit(selectedProject)}>Chỉnh sửa</button><button className="button secondary" onClick={() => duplicateProject(selectedProject)}>Nhân bản</button><button className="button secondary" onClick={() => archiveProject(selectedProject)}>Hoàn thành</button><button className="button secondary" onClick={() => removeProject(selectedProject)}>Xóa</button></div>
               <dl className="detail-grid"><div><dt>Chủ đầu tư</dt><dd>{selectedProject.investor}</dd></div><div><dt>Chủ nhiệm dự án</dt><dd>{selectedProject.manager}</dd></div><div><dt>Địa điểm</dt><dd>{selectedProject.location}</dd></div><div><dt>Trạng thái</dt><dd>{selectedProject.status}</dd></div><div><dt>Ngày bắt đầu</dt><dd>{selectedProject.startDate || "Chưa xác định"}</dd></div><div><dt>Ngày kết thúc</dt><dd>{selectedProject.finishDate || "Chưa xác định"}</dd></div><div><dt>Tổng giá trị</dt><dd>{formatCurrency(selectedProject.budget)} đ</dd></div><div><dt>Tiến độ tổng hợp</dt><dd>{selectedProject.progress}%</dd></div></dl>
               <div className="description-box"><span>Mô tả</span><p>{selectedProject.description || "Chưa có mô tả."}</p></div>
               <div className="scope-box"><div><span>Phạm vi hiển thị</span><strong>{selectedProject.visible ? "Đang bật" : "Đang tắt"}</strong></div><button className="switch" role="switch" aria-checked={selectedProject.visible} onClick={() => toggleVisibility(selectedProject.id)}><i /></button></div>
-              <div className="activity-note"><span>◷</span><div><strong>Cập nhật gần nhất</strong><p>{selectedProject.updatedAt} · Dữ liệu được lưu trên trình duyệt này</p></div></div>
+              <div className="activity-note"><span>◷</span><div><strong>Cập nhật gần nhất</strong><p>{new Date(selectedProject.updatedAt).toLocaleString("vi-VN")} · Đã lưu trong cơ sở dữ liệu</p></div></div>
             </aside>}
           </section>
         </>}
 
-        <footer className="statusbar"><span className="online-dot" /> Localhost đang hoạt động <span>·</span><span>{notice}</span><span className="grow" /><span>Chưa kết nối cơ sở dữ liệu thật</span></footer>
+        <footer className="statusbar"><span className="online-dot" /> Localhost đang hoạt động <span>·</span><span>{notice}</span><span className="grow" /><span>ASP.NET Core · SQLite</span></footer>
       </main>
+
+      {commonDialog.dialog}
 
       {modalMode && <div className="modal-backdrop">
         <section className="modal" role="dialog" aria-modal="true" aria-labelledby="project-modal-title">

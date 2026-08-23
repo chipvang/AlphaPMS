@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+TestResults/
+src/AlphaPMS.Api/Data/*.db
+src/AlphaPMS.Api/Data/*.db-shm
+src/AlphaPMS.Api/Data/*.db-wal
+tests/TestData/*.db
+tests/TestData/*.db-shm
+tests/TestData/*.db-wal

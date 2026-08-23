@@ -279,6 +279,7 @@ Không coi việc build thành công là đủ để xác nhận nghiệp vụ �
 - `Giao_Dien_DuToan_V1.md`: Đặc tả giao diện Quản lý dự toán ba khối V1.
 - `Giao_Dien_Chart_V1.md`: Đặc tả giao diện biểu đồ vật liệu và máy thi công V1.
 - `Kien_Truc_Undo_Redo_V1.md`: Kiến trúc Undo/Redo dùng chung cho các thao tác chỉnh sửa dữ liệu.
+- `Kien_Truc_Quan_Ly_Du_An_V1.md`: Kiến trúc dữ liệu, API và luồng lưu trữ thật của module Quản lý dự án/WBS.
 
 Danh mục này phải được cập nhật khi tạo hoặc chốt thêm tài liệu.
 
@@ -288,4 +289,4 @@ Danh mục này phải được cập nhật khi tạo hoặc chốt thêm tài 
 - Chủ dự án có quyền bổ sung hoặc thay đổi quy tắc.
 - Khi quy tắc thay đổi, cập nhật trực tiếp file này và ghi ngày cập nhật ở cuối tài liệu.
 
-Ngày cập nhật gần nhất: **18/08/2026**.
+Ngày cập nhật gần nhất: **21/08/2026**.

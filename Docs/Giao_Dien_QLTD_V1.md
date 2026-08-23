@@ -230,7 +230,8 @@ Các cột nhập nhanh hỗ trợ inline edit theo nguyên tắc:
 ### 8.2. Mật độ hiển thị cột
 
 - Độ rộng chính thức: Cơ bản = STT 50px, Tác vụ 116px, Tên công việc 415px; tổng 581px.
-- Tiến độ = Thời lượng 60px, Bắt đầu 70px, Kết thúc 70px, Trước 50px, Tình trạng 96px; tổng 346px.
+- Tiến độ = Thời lượng 64px, Bắt đầu 70px, Kết thúc 70px, Trước 50px, Tình trạng 96px; tổng 350px.
+- Cột Tên công việc có `min-width: 350px`, vẫn được phép resize rộng hơn. Ô nhập Thời lượng rộng `30px`, giữ suffix “ngày” trên cùng một dòng.
 - Dự toán = Đơn vị 60px, Khối lượng 86px, Sản lượng/ngày 100px; tổng 246px.
 - Nguồn lực = HSM 50px, SLM 50px, NCLM 60px, NCCH 60px; tổng 220px.
 - Khi bật Tất cả, TaskGrid rộng 1.393px tại độ rộng mặc định của cột Tên công việc. Không tự co giãn các cột theo nội dung.
@@ -570,3 +571,44 @@ Các nội dung đã thống nhất:
 Nguồn mô phỏng giao diện đã chốt:
 
 `Code/public/alpha-pms-interface.html`
+
+## Quy tắc cây WBS linh hoạt
+
+- Nhóm là cấp tùy chọn. Công tác có thể trực tiếp dưới Hạng mục hoặc nằm dưới Nhóm.
+- Hạng mục và Nhóm là node tổng hợp (summary); chỉ Công tác (`ItemType = Task`) là công tác thi công thực và được phép gán định mức, hao phí trong các module tương lai.
+- Nút **+** tại Hạng mục hoặc Nhóm tạo trực tiếp một Công tác con ở cuối danh sách con của node đó. Dòng Công tác không hiển thị nút này.
+- **Chèn phía trên** và **Chèn phía dưới** tiếp tục tạo item cùng cấp, không có ý nghĩa tạo con.
+- Khi giảm cấp một Công tác từ Nhóm ra Hạng mục, `ItemType` vẫn là `Task`; Gantt và capability luôn phân loại theo `ItemType`, không theo độ sâu của cây.
+
+## Bộ action UI chính thức của cột Tác vụ
+
+- Mỗi action button có kích thước render cố định `16px × 16px`; khoảng cách giữa hai button liền kề là `1px`.
+- Icon mono màu trung tính, kích thước thị giác khoảng `10–12px`; không border, không shadow và nền mặc định trong suốt.
+- `▲` là **Chèn lên trên**, `▼` là **Chèn xuống dưới** và icon thùng rác là **Xóa**. Hai action **Đẩy vào/Đẩy ra** đã được loại bỏ; reorder/reparent dùng drag từ ô STT.
+- Dòng Dự án chỉ hiển thị `+` để thêm Hạng mục. Hạng mục/Nhóm hiển thị `+`, Chèn trên, Chèn dưới và Xóa. Công tác không có `+` và không dùng placeholder cho action bị thiếu.
+
+## Kéo thả sắp xếp cây WBS
+
+- Không dùng grip trong cột Tên công việc. Toàn bộ ô STT của Hạng mục, Nhóm và Công tác là drag handle; Project không kéo trong iteration này.
+- Drag dùng chuột trái và Pointer Events, giữ pointer capture trong toàn thao tác; chỉ bắt đầu sau khi con trỏ di chuyển tối thiểu `4px`.
+- Vị trí thả được biểu diễn bằng duy nhất một insertion line giữa các dòng. Chỉ slot hợp lệ theo ItemType mới được highlight; vị trí không hợp lệ hoặc phím `Escape` sẽ hủy thao tác.
+- Hạng mục và Nhóm di chuyển cùng toàn bộ subtree. Công tác có thể chuyển giữa các Nhóm hoặc giữa Nhóm và Hạng mục theo hierarchy đã chốt.
+- Drag không đổi `ItemType` hay dữ liệu nghiệp vụ; thao tác chỉ cập nhật `ParentId`, chuẩn hóa `SortOrder` trong sibling list và giữ nguyên ID.
+- Một lần drag-drop hợp lệ là một action duy nhất trong shared Undo/Redo. Save/Reload dùng API WBS hiện tại để giữ nguyên hierarchy và thứ tự mới.
+
+## Context menu của Công tác
+
+- Right-click chỉ trên dòng Công tác mở menu theo thứ tự: **Xem / sửa thông tin công tác**, **Chuyển công tác thành Nhóm**, separator, **Xóa công tác**.
+- Công tác trực tiếp dưới Hạng mục có thể chuyển thành Nhóm ở mọi vị trí đầu, giữa hoặc cuối. Các Công tác sibling liên tiếp ngay phía sau sẽ tự trở thành con của Nhóm mới cho đến trước Nhóm kế tiếp hoặc đến hết Hạng mục; một Nhóm rỗng ở cuối vẫn hợp lệ.
+- Cây hỗn hợp gồm Công tác trực tiếp dưới Hạng mục, Nhóm và Công tác trong Nhóm là hợp lệ. Summary của Hạng mục lấy toàn bộ Công tác descendant ở cả hai nhánh trực tiếp và trong Nhóm.
+- Mục xem/sửa chọn đúng Công tác và mở vùng `TaskDetail` hiện có; mục xóa dùng lại luồng xác nhận/xóa hiện tại.
+- Chuyển `Task → Group` giữ nguyên ID, ProjectId, ParentId, vị trí và SortOrder; là một action Undo/Redo duy nhất và không tạo endpoint hay entity mới.
+- Chỉ Công tác trực tiếp dưới Hạng mục mới được chuyển; Công tác dưới Nhóm vẫn bị từ chối để không tạo cấu trúc Nhóm dưới Nhóm.
+- Nếu Công tác có **quan hệ công việc** hoặc dữ liệu Task-specific, giao diện phải hỏi xác nhận bằng tiếng Việt. Chỉ khi người dùng đồng ý mới xóa các quan hệ công việc liên quan, chuẩn hóa dữ liệu Group và thực hiện conversion trong cùng một action Undo/Redo.
+
+## Common Dialog dùng chung
+
+- Mọi xác nhận, cảnh báo và câu hỏi cần quyết định của người dùng phải sử dụng Common Dialog thống nhất của AlphaPMS; không dùng hộp thoại mặc định của trình duyệt và không tạo dialog riêng theo từng màn hình.
+- Common Dialog thống nhất bố cục tiêu đề, biểu tượng trạng thái, nội dung, diễn giải, nút Hủy bỏ và nút xác nhận; hỗ trợ các tone `info`, `warning`, `danger` nhưng giữ cùng hệ thiết kế.
+- Nội dung giao diện viết bằng tiếng Việt và dùng thuật ngữ nghiệp vụ thống nhất. `Dependency` luôn hiển thị là **Quan hệ công việc**.
+- Các luồng đang dùng Common Dialog gồm: xóa dòng tiến độ, bỏ quan hệ công việc, chuyển Công tác thành Nhóm khi phải bỏ liên kết/dữ liệu, hoàn thành dự án và xóa dự án.

@@ -37,8 +37,49 @@ test("keeps the committed schedule interaction contract", async () => {
   ]);
 
   assert.match(page, /const \[outlineLevel, setOutlineLevel\] = useState\(4\)/);
-  assert.match(page, /aria-label="Chèn phía trên"/);
-  assert.match(page, /aria-label="Chèn phía dưới"/);
+  assert.match(page, /aria-label="Chèn lên trên"/);
+  assert.match(page, /aria-label="Chèn xuống dưới"/);
+  assert.match(page, /aria-label="Thêm hạng mục"/);
+  assert.match(page, /aria-label="Thêm công tác"/);
+  assert.doesNotMatch(page, /aria-label="Đẩy vào"|aria-label="Đẩy ra"|action-slot-indent|action-slot-outdent/);
+  assert.match(page, /aria-label="Xóa"/);
+  assert.match(page, /item\.type === "project"[\s\S]*\? <button className="action-slot-add" aria-label="Thêm hạng mục"/);
+  assert.match(page, /item\.type === "workItem" \|\| item\.type === "group"/);
+  assert.match(css, /\.row-actions \{[\s\S]*gap:\s*1px/);
+  assert.match(css, /\.row-actions button \{[\s\S]*width:\s*16px;[\s\S]*height:\s*16px/);
+  assert.match(css, /\.action-trash-icon \{[\s\S]*width:\s*12px;[\s\S]*height:\s*12px/);
+  assert.match(css, /grid-template-columns:\s*repeat\(4, 16px\)/);
+  assert.match(css, /column-gap:\s*1px/);
+  assert.match(css, /justify-content:\s*end/);
+  assert.match(css, /\.action-slot-add \{ grid-column: 1; \}/);
+  assert.match(css, /\.action-slot-delete \{ grid-column: 4; \}/);
+  assert.doesNotMatch(css, /action-arrow-icon/);
+  assert.doesNotMatch(page, /wbs-drag-handle/);
+  assert.match(page, /aria-label=\{item\.type === "project" \? undefined : "Kéo để sắp xếp"\}/);
+  assert.match(page, /data-wbs-row-id=\{item\.id\}/);
+  assert.match(page, /className=\{`wbs-cell \$\{item\.type === "project" \? "" : "wbs-drag-cell"\}`\}/);
+  assert.match(page, /setPointerCapture\(event\.pointerId\)/);
+  assert.match(page, /Math\.hypot\([\s\S]*>= 4/);
+  assert.match(page, /buildTreeInsertionSlots\(items, visibleItems\.map/);
+  assert.match(page, /moveTreeItemToSlot\(items, currentDrag\.sourceId, preview\)/);
+  assert.match(page, /commitItems\(recalculateScheduleWbs\(moved\)/);
+  assert.match(css, /\.wbs-cell\.wbs-drag-cell \{[\s\S]*cursor:\s*grab/);
+  assert.match(page, /ref=\{wbsInsertionLineRef\} className="wbs-insertion-line"/);
+  assert.match(css, /\.wbs-insertion-line \{[\s\S]*position:\s*fixed;[\s\S]*height:\s*2px/);
+  assert.doesNotMatch(css, /wbs-drop-inside|wbs-drag-handle|wbs-insertion-before|wbs-insertion-after/);
+  assert.match(page, /Xem \/ sửa thông tin công tác[\s\S]*Chuyển công tác thành Nhóm[\s\S]*task-context-separator[\s\S]*Xóa công tác/);
+  assert.match(page, /parent\?\.type !== "workItem"/);
+  assert.match(page, /dependency\.predecessorTaskId === task\.id \|\| dependency\.successorTaskId === task\.id/);
+  assert.match(page, /useCommonDialog/);
+  assert.match(page, /commonDialog\.confirm/);
+  assert.doesNotMatch(page, /globalThis\.confirm|window\.confirm/);
+  assert.match(page, /const minimumTaskNameColumnWidth = 350/);
+  assert.match(page, /const scheduleColumnWidths = \[74, 70, 70, 50, 96\]/);
+  assert.match(css, /\.duration-cell input \{[\s\S]*width:\s*50px/);
+  assert.match(page, /quan hệ công việc liên quan/);
+  assert.match(page, /current\.dependencies\.filter/);
+  assert.match(page, /description: `Chuyển \$\{task\.wbs\} · \$\{task\.name\} thành Nhóm`/);
+  assert.match(css, /\.task-context-menu \{/);
   assert.match(page, /7 \* ganttDayStep/);
   assert.match(page, /summary-progress-line/);
   assert.match(page, /calculateScheduleOrder/);
@@ -49,7 +90,7 @@ test("keeps the committed schedule interaction contract", async () => {
   assert.match(page, /gridColumn: "span 5"[^\n]*>Tiến độ<\/div>/);
   assert.match(page, />Sản lượng\/ngày<\/div>/);
   assert.match(page, /const basicColumnWidths = \[50, 116, taskNameColumnWidth\]/);
-  assert.match(page, /const scheduleColumnWidths = \[60, 70, 70, 50, 96\]/);
+  assert.match(page, /const scheduleColumnWidths = \[74, 70, 70, 50, 96\]/);
   assert.match(page, /const estimateColumnWidths = \[60, 86, 100\]/);
   assert.match(page, /const resourceColumnWidths = \[50, 50, 60, 60\]/);
   assert.match(page, /<div>HSM<\/div><div>SLM<\/div><div>NCLM<\/div><div>NCCH<\/div>/);
@@ -78,8 +119,29 @@ test("keeps the committed schedule interaction contract", async () => {
   assert.match(css, /\.schedule-board-body/);
   assert.match(css, /\.summary-workItem/);
   assert.match(css, /\.summary-group/);
-  assert.match(css, /height:\s*35px/);
+assert.match(css, /height:\s*32px/);
   assert.match(layout, /lang="vi"/);
+});
+
+test("uses the ASP.NET Core API for Project, WBS and dependency production data", async () => {
+  const [page, dbContext, dependencyService] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../Backend/src/AlphaPMS.Infrastructure/Persistence/AlphaPmsDbContext.cs", import.meta.url), "utf8"),
+    readFile(new URL("../Backend/src/AlphaPMS.Application/Projects/DependencyService.cs", import.meta.url), "utf8"),
+  ]);
+
+  assert.doesNotMatch(page, /localStorage/);
+  assert.doesNotMatch(page, /initialProjects|initialScheduleItems/);
+  assert.match(page, /requestApi<Project\[\]>\("\/api\/projects"\)/);
+  assert.match(page, /\/api\/projects\/\$\{project\.id\}\/work-items/);
+  assert.match(page, /\/api\/projects\/\$\{project\.id\}\/dependencies/);
+  assert.match(page, /NEXT_PUBLIC_API_BASE_URL/);
+  assert.match(page, /method: "PUT"/);
+  assert.match(dbContext, /DbSet<Project>/);
+  assert.match(dbContext, /DbSet<WorkItem>/);
+  assert.match(dbContext, /DbSet<TaskDependency>/);
+  assert.match(dependencyService, /DEPENDENCY_CYCLE/);
+  assert.doesNotMatch(page, /Cloudflare D1/);
 });
 
 test("auto-schedules FS, SS, FF and SF dependencies through a DAG", async () => {
