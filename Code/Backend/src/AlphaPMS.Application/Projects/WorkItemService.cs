@@ -52,24 +52,27 @@ public sealed class WorkItemService(IAlphaPmsRepository repository, IClock clock
     }
 
     public Task<IReadOnlyList<WorkItemDto>> ReplaceProjectWorkItemsAsync(Guid projectId, ReplaceWorkItemsInput input, CancellationToken cancellationToken) =>
-        repository.ExecuteInTransactionAsync(async transactionToken =>
+        repository.ExecuteInTransactionAsync(transactionToken => ReplaceProjectWorkItemsCoreAsync(projectId, input, transactionToken), cancellationToken);
+
+    internal async Task<IReadOnlyList<WorkItemDto>> ReplaceProjectWorkItemsCoreAsync(Guid projectId,
+        ReplaceWorkItemsInput input, CancellationToken cancellationToken)
+    {
+        await EnsureProject(projectId, cancellationToken);
+        ValidateTree(projectId, input.Items);
+        var current = await repository.GetProjectWorkItemsAsync(projectId, cancellationToken);
+        ValidateTaskConversions(current, input.Items, await repository.GetProjectDependenciesAsync(projectId, cancellationToken));
+        var currentById = current.ToDictionary(x => x.Id);
+        var incomingIds = input.Items.Select(x => x.Id!.Value).ToHashSet();
+        var removedIds = current.Where(x => !incomingIds.Contains(x.Id)).Select(x => x.Id).ToHashSet();
+        repository.RemoveWorkItems(current.Where(x => removedIds.Contains(x.Id)).OrderByDescending(GetDepth));
+        foreach (var item in input.Items)
         {
-            await EnsureProject(projectId, transactionToken);
-            ValidateTree(projectId, input.Items);
-            var current = await repository.GetProjectWorkItemsAsync(projectId, transactionToken);
-            ValidateTaskConversions(current, input.Items, await repository.GetProjectDependenciesAsync(projectId, transactionToken));
-            var currentById = current.ToDictionary(x => x.Id);
-            var incomingIds = input.Items.Select(x => x.Id!.Value).ToHashSet();
-            var removedIds = current.Where(x => !incomingIds.Contains(x.Id)).Select(x => x.Id).ToHashSet();
-            repository.RemoveWorkItems(current.Where(x => removedIds.Contains(x.Id)).OrderByDescending(GetDepth));
-            foreach (var item in input.Items)
-            {
-                if (currentById.TryGetValue(item.Id!.Value, out var existing)) Apply(existing, item);
-                else repository.AddWorkItem(CreateEntity(item.Id.Value, projectId, item));
-            }
-            await repository.SaveChangesAsync(transactionToken);
-            return (IReadOnlyList<WorkItemDto>)(await repository.GetProjectWorkItemsAsync(projectId, transactionToken)).Select(ContractMapper.ToDto).ToList();
-        }, cancellationToken);
+            if (currentById.TryGetValue(item.Id!.Value, out var existing)) Apply(existing, item);
+            else repository.AddWorkItem(CreateEntity(item.Id.Value, projectId, item));
+        }
+        await repository.SaveChangesAsync(cancellationToken);
+        return (await repository.GetProjectWorkItemsAsync(projectId, cancellationToken)).Select(ContractMapper.ToDto).ToList();
+    }
 
     private static int GetDepth(WorkItem item)
     {

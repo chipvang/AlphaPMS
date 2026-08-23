@@ -3,7 +3,7 @@
 import { CSSProperties, FormEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useUndoRedo } from "../lib/history/useUndoRedo";
-import type { ProjectDto, ProjectInput, TaskDependencyDto, WorkItemDto } from "../lib/projects/types";
+import type { ProjectDto, ProjectInput, ProjectScheduleDto, WorkItemDto } from "../lib/projects/types";
 import { DependencyType, formatDependencyLabel, propagateDependencySchedule, TaskDependency, validateTaskDependency } from "../lib/schedule/dependencies";
 import { buildTreeInsertionSlots, moveTreeItemToSlot, TreeInsertionSlot } from "../lib/schedule/treeReorder";
 import { convertTaskToGroupWithFollowingTasks } from "../lib/schedule/taskConversion";
@@ -64,6 +64,14 @@ function displayToIsoDate(value: string) {
   return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
 }
 
+function createEntityId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
+    const random = Math.floor(Math.random() * 16);
+    return (character === "x" ? random : (random & 0x3) | 0x8).toString(16);
+  });
+}
+
 function buildScheduleItems(projects: Project[], records: WorkItemDto[]) {
   const byProject = new Map<string, WorkItemDto[]>();
   records.forEach((record) => byProject.set(record.projectId, [...(byProject.get(record.projectId) ?? []), record]));
@@ -76,7 +84,7 @@ function buildScheduleItems(projects: Project[], records: WorkItemDto[]) {
     children.forEach((items) => items.sort((a, b) => a.sortOrder - b.sortOrder));
     const append = (parentId: string | null, uiParentId: string) => {
       (children.get(parentId) ?? []).forEach((item) => {
-        result.push({ ...item, parentId: uiParentId, wbs: "", startDate: isoToDisplayDate(item.startDate), finishDate: isoToDisplayDate(item.finishDate), ganttLeft: 0, ganttWidth: 1 });
+        result.push({ ...item, parentId: uiParentId, wbs: "", startDate: isoToDisplayDate(item.startDate), finishDate: isoToDisplayDate(item.finishDate), machineShiftCoefficient: item.machineShiftFactor, managedLabor: item.nclm, ganttLeft: 0, ganttWidth: 1 });
         append(item.id, item.id);
       });
     };
@@ -126,6 +134,37 @@ type ScheduleState = {
   items: ScheduleItem[];
   dependencies: TaskDependency[];
 };
+
+function buildProjectSchedulePayload(projectId: string, items: ScheduleItem[], dependencies: TaskDependency[]) {
+  const siblingCounts = new Map<string, number>();
+  return {
+    workItems: items.filter((item) => item.projectId === projectId && item.type !== "project").map((item) => {
+      const parentId = item.parentId === projectId ? null : item.parentId;
+      const siblingKey = parentId ?? "root";
+      const sortOrder = (siblingCounts.get(siblingKey) ?? 0) + 1;
+      siblingCounts.set(siblingKey, sortOrder);
+      return {
+        id: item.id, projectId, parentId, type: item.type, name: item.name,
+        unit: item.type === "task" ? item.unit : null,
+        quantity: item.type === "task" ? item.quantity : null,
+        startDate: item.type === "task" ? displayToIsoDate(item.startDate) : null,
+        finishDate: item.type === "task" ? displayToIsoDate(item.finishDate) : null,
+        duration: item.type === "task" ? item.duration : 1,
+        progress: item.type === "task" ? item.progress : 0,
+        machineShiftFactor: item.type === "task" ? item.machineShiftCoefficient : null,
+        nclm: item.type === "task" ? item.managedLabor : null,
+        permanentLabor: item.type === "task" ? item.permanentLabor : null,
+        sortOrder,
+      };
+    }),
+    dependencies: dependencies.filter((dependency) => dependency.projectId === projectId).map((dependency) => ({
+      predecessorTaskId: dependency.predecessorTaskId,
+      successorTaskId: dependency.successorTaskId,
+      dependencyType: dependency.dependencyType,
+      lagDays: dependency.lag,
+    })),
+  };
+}
 
 type DependencyDraft = Pick<TaskDependency, "id" | "predecessorTaskId" | "dependencyType" | "lag">;
 
@@ -439,6 +478,7 @@ function InlineDateEditor({ label, value, onCommit, onInvalid }: { label: string
 
 function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (message: string) => void }) {
   const scheduleHistory = useUndoRedo(initialScheduleState, 100);
+  const persistedProjectFingerprintsRef = useRef(new Map<string, string>());
   const { items, dependencies } = scheduleHistory.value;
   const [selectedItemId, setSelectedItemId] = useState("ba-k95");
   const [selectedDependencyId, setSelectedDependencyId] = useState<string | null>(null);
@@ -605,13 +645,10 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all(projects.map(async (project) => ({
-      workItems: await requestApi<WorkItemDto[]>(`/api/projects/${project.id}/work-items`),
-      dependencies: await requestApi<TaskDependencyDto[]>(`/api/projects/${project.id}/dependencies`),
-    })))
+    Promise.all(projects.map((project) => requestApi<ProjectScheduleDto>(`/api/projects/${project.id}/schedule`)))
       .then((groups) => {
         if (cancelled) return;
-        scheduleHistory.reset({
+        const loadedState: ScheduleState = {
           items: buildScheduleItems(projects, groups.flatMap((group) => group.workItems)),
           dependencies: groups.flatMap((group) => group.dependencies.map((dependency) => ({
             id: dependency.id,
@@ -621,7 +658,10 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
             dependencyType: dependency.dependencyType,
             lag: dependency.lagDays,
           }))),
-        });
+        };
+        scheduleHistory.reset(loadedState);
+        persistedProjectFingerprintsRef.current = new Map(projects.map((project) =>
+          [project.id, JSON.stringify(buildProjectSchedulePayload(project.id, loadedState.items, loadedState.dependencies))]));
         setSelectedItemId(projects[0]?.id ?? "");
         setScheduleLoading(false);
       })
@@ -634,40 +674,25 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
   async function saveSchedule() {
     setScheduleSaving(true);
     try {
-      const saved = await Promise.all(projects.map(async (project) => {
-        const siblingCounts = new Map<string, number>();
-        const payload = items.filter((item) => item.projectId === project.id && item.type !== "project").map((item) => {
-          const parentId = item.parentId === project.id ? null : item.parentId;
-          const siblingKey = parentId ?? "root";
-          const sortOrder = (siblingCounts.get(siblingKey) ?? 0) + 1;
-          siblingCounts.set(siblingKey, sortOrder);
-          return { id: item.id, projectId: project.id, parentId, type: item.type, name: item.name, unit: item.unit, quantity: item.quantity, startDate: displayToIsoDate(item.startDate), finishDate: displayToIsoDate(item.finishDate), duration: item.duration, progress: item.progress, sortOrder };
+      const dirtyProjects = projects.map((project) => ({ project, payload: buildProjectSchedulePayload(project.id, items, dependencies) }))
+        .filter(({ project, payload }) => persistedProjectFingerprintsRef.current.get(project.id) !== JSON.stringify(payload));
+      if (!dirtyProjects.length) { onNotice("Không có thay đổi cần lưu"); return; }
+      const results = await Promise.allSettled(dirtyProjects.map(async ({ project, payload }) => {
+        await requestApi<ProjectScheduleDto>(`/api/projects/${project.id}/schedule`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
         });
-        const savedDependencies = await requestApi<TaskDependencyDto[]>(`/api/projects/${project.id}/dependencies`, {
-            method: "PUT",
-            body: JSON.stringify({ items: dependencies.filter((dependency) => dependency.projectId === project.id).map((dependency) => ({
-              predecessorTaskId: dependency.predecessorTaskId,
-              successorTaskId: dependency.successorTaskId,
-              dependencyType: dependency.dependencyType,
-              lagDays: dependency.lag,
-            })) }),
-          });
-        // Persist removed relations first so a confirmed Task -> Group conversion
-        // cannot be rejected by a relation that the same Save action removes.
-        const savedItems = await requestApi<WorkItemDto[]>(`/api/projects/${project.id}/work-items`, { method: "PUT", body: JSON.stringify({ items: payload }) });
-        return { savedItems, savedDependencies };
+        persistedProjectFingerprintsRef.current.set(project.id, JSON.stringify(payload));
+        return project;
       }));
-      scheduleHistory.reset({
-        items: buildScheduleItems(projects, saved.flatMap((group) => group.savedItems)),
-        dependencies: saved.flatMap((group) => group.savedDependencies.map((dependency) => ({
-          id: dependency.id,
-          projectId: dependency.projectId,
-          predecessorTaskId: dependency.predecessorTaskId,
-          successorTaskId: dependency.successorTaskId,
-          dependencyType: dependency.dependencyType,
-          lag: dependency.lagDays,
-        }))),
-      });
+      const failures = results.flatMap((result, index) => result.status === "rejected"
+        ? [`${dirtyProjects[index].project.name}: ${result.reason instanceof Error ? result.reason.message : "Không thể lưu"}`]
+        : []);
+      if (failures.length) {
+        onNotice(`Một số dự án chưa lưu được: ${failures.join("; ")}`);
+        return;
+      }
+      scheduleHistory.reset({ items, dependencies });
       onNotice("Đã lưu cây WBS và quan hệ công việc vào cơ sở dữ liệu");
     } catch (error) {
       onNotice(error instanceof Error ? error.message : "Không thể lưu cây WBS");
@@ -1196,7 +1221,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       task: "Công tác mới",
     };
     const newItem: ScheduleItem = {
-      id: `task-${Date.now()}`,
+      id: createEntityId(),
       projectId,
       parentId,
       type: itemType,
@@ -1238,7 +1263,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     const itemName = itemType === "workItem" ? "Hạng mục mới" : "Công tác mới";
     const newItem: ScheduleItem = {
       // ID is generated only when the user clicks an action button.
-      id: `task-${Date.now()}`,
+      id: createEntityId(),
       projectId: parent.projectId,
       parentId: parent.id,
       type: itemType,

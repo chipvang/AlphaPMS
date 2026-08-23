@@ -39,22 +39,32 @@ public sealed class DependencyService(IAlphaPmsRepository repository, IClock clo
     }
 
     public Task<IReadOnlyList<TaskDependencyDto>> ReplaceProjectDependenciesAsync(Guid projectId, ReplaceDependenciesInput input, CancellationToken cancellationToken) =>
-        repository.ExecuteInTransactionAsync(async transactionToken =>
+        repository.ExecuteInTransactionAsync(transactionToken => ReplaceProjectDependenciesCoreAsync(projectId, input, transactionToken), cancellationToken);
+
+    internal async Task ClearProjectDependenciesCoreAsync(Guid projectId, CancellationToken cancellationToken)
+    {
+        foreach (var dependency in await repository.GetProjectDependenciesAsync(projectId, cancellationToken))
+            repository.RemoveDependency(dependency);
+        await repository.SaveChangesAsync(cancellationToken);
+    }
+
+    internal async Task<IReadOnlyList<TaskDependencyDto>> ReplaceProjectDependenciesCoreAsync(Guid projectId,
+        ReplaceDependenciesInput input, CancellationToken cancellationToken)
+    {
+        var current = await repository.GetProjectDependenciesAsync(projectId, cancellationToken);
+        var tasks = await repository.GetProjectWorkItemsAsync(projectId, cancellationToken);
+        var validated = new List<TaskDependency>();
+        foreach (var item in input.Items)
         {
-            var current = await repository.GetProjectDependenciesAsync(projectId, transactionToken);
-            var tasks = await repository.GetProjectWorkItemsAsync(projectId, transactionToken);
-            var validated = new List<TaskDependency>();
-            foreach (var item in input.Items)
-            {
-                Validate(projectId, item, tasks, validated, null);
-                validated.Add(new TaskDependency(Guid.NewGuid(), projectId, item.PredecessorTaskId, item.SuccessorTaskId,
-                    ContractMapper.ParseDependencyType(item.DependencyType), item.LagDays, clock.UtcNow));
-            }
-            foreach (var dependency in current) repository.RemoveDependency(dependency);
-            foreach (var dependency in validated) repository.AddDependency(dependency);
-            await repository.SaveChangesAsync(transactionToken);
-            return (IReadOnlyList<TaskDependencyDto>)validated.Select(ContractMapper.ToDto).ToList();
-        }, cancellationToken);
+            Validate(projectId, item, tasks, validated, null);
+            validated.Add(new TaskDependency(Guid.NewGuid(), projectId, item.PredecessorTaskId, item.SuccessorTaskId,
+                ContractMapper.ParseDependencyType(item.DependencyType), item.LagDays, clock.UtcNow));
+        }
+        foreach (var dependency in current) repository.RemoveDependency(dependency);
+        foreach (var dependency in validated) repository.AddDependency(dependency);
+        await repository.SaveChangesAsync(cancellationToken);
+        return validated.Select(ContractMapper.ToDto).ToList();
+    }
 
     private static void Validate(Guid projectId, TaskDependencyInput input, IReadOnlyList<WorkItem> tasks,
         IReadOnlyList<TaskDependency> dependencies, Guid? exceptId)

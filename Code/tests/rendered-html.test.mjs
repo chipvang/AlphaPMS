@@ -124,22 +124,24 @@ assert.match(css, /height:\s*32px/);
 });
 
 test("uses the ASP.NET Core API for Project, WBS and dependency production data", async () => {
-  const [page, dbContext, dependencyService] = await Promise.all([
+  const [page, dbContext, dependencyService, scheduleService] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../Backend/src/AlphaPMS.Infrastructure/Persistence/AlphaPmsDbContext.cs", import.meta.url), "utf8"),
     readFile(new URL("../Backend/src/AlphaPMS.Application/Projects/DependencyService.cs", import.meta.url), "utf8"),
+    readFile(new URL("../Backend/src/AlphaPMS.Application/Projects/ProjectScheduleService.cs", import.meta.url), "utf8"),
   ]);
 
   assert.doesNotMatch(page, /localStorage/);
   assert.doesNotMatch(page, /initialProjects|initialScheduleItems/);
   assert.match(page, /requestApi<Project\[\]>\("\/api\/projects"\)/);
-  assert.match(page, /\/api\/projects\/\$\{project\.id\}\/work-items/);
-  assert.match(page, /\/api\/projects\/\$\{project\.id\}\/dependencies/);
+  assert.match(page, /\/api\/projects\/\$\{project\.id\}\/schedule/);
   assert.match(page, /NEXT_PUBLIC_API_BASE_URL/);
   assert.match(page, /method: "PUT"/);
   assert.match(dbContext, /DbSet<Project>/);
   assert.match(dbContext, /DbSet<WorkItem>/);
   assert.match(dbContext, /DbSet<TaskDependency>/);
+  assert.match(scheduleService, /ExecuteInTransactionAsync/);
+  assert.match(scheduleService, /ClearProjectDependenciesCoreAsync/);
   assert.match(dependencyService, /DEPENDENCY_CYCLE/);
   assert.doesNotMatch(page, /Cloudflare D1/);
 });

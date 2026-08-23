@@ -34,6 +34,9 @@ export type WorkItemDto = {
   finishDate: string;
   duration: number;
   progress: number;
+  machineShiftFactor?: number;
+  nclm?: number;
+  permanentLabor?: number;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -51,5 +54,10 @@ export type TaskDependencyDto = {
 };
 
 export type WorkItemInput = Omit<WorkItemDto, "id" | "createdAt" | "updatedAt"> & { id?: string };
+
+export type ProjectScheduleDto = {
+  workItems: WorkItemDto[];
+  dependencies: TaskDependencyDto[];
+};
 
 export type ApiErrorBody = { error: { code: string; message: string; details?: Record<string, string> } };

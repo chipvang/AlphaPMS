@@ -128,6 +128,74 @@ public sealed class ApiPersistenceTests
         }
     }
 
+    [Fact]
+    public async Task Schedule_save_is_atomic_when_dependency_validation_fails()
+    {
+        var databasePath = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "Backend", "tests", "TestData", $"alphapms-schedule-{Guid.NewGuid():N}.db"));
+        Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
+        await using var factory = new AlphaPmsApiFactory(databasePath, resetDatabase: true);
+        using var client = factory.CreateClient();
+        var projectResponse = await client.PostAsJsonAsync("/api/projects", new
+        {
+            code = "SCHEDULE-ATOMIC", name = "Schedule transaction", investor = "", location = "", manager = "",
+            startDate = "2026-08-23", finishDate = "2026-08-30", budget = 0, progress = 0,
+            status = new string(['C', 'h', 'u', (char)7849, 'n', ' ', 'b', (char)7883]),
+            description = "", visible = true
+        });
+        Assert.True(projectResponse.IsSuccessStatusCode, await projectResponse.Content.ReadAsStringAsync());
+        var projectId = await ReadId(projectResponse);
+        var workPackageId = Guid.NewGuid();
+        var taskAId = Guid.NewGuid();
+        var taskBId = Guid.NewGuid();
+        object WorkItem(Guid id, Guid? parentId, string type, string name, int sortOrder) => new
+        {
+            id, projectId, parentId, type, name, unit = type == "task" ? "m" : null,
+            quantity = type == "task" ? 12.5m : (decimal?)null, duration = 2,
+            startDate = "2026-08-23", finishDate = "2026-08-24", progress = type == "task" ? 25 : 0, sortOrder,
+            machineShiftFactor = type == "task" ? 1.25m : (decimal?)null,
+            nclm = type == "task" ? 3.5m : (decimal?)null,
+            permanentLabor = type == "task" ? 2m : (decimal?)null
+        };
+        var initial = await client.PutAsJsonAsync($"/api/projects/{projectId}/schedule", new
+        {
+            workItems = new[]
+            {
+                WorkItem(workPackageId, null, "workItem", "Original package", 1),
+                WorkItem(taskAId, workPackageId, "task", "Task A", 1),
+                WorkItem(taskBId, workPackageId, "task", "Task B", 2)
+            },
+            dependencies = new[] { new { predecessorTaskId = taskAId, successorTaskId = taskBId, dependencyType = "FS", lagDays = 0 } }
+        });
+        Assert.Equal(HttpStatusCode.OK, initial.StatusCode);
+
+        var invalid = await client.PutAsJsonAsync($"/api/projects/{projectId}/schedule", new
+        {
+            workItems = new[]
+            {
+                WorkItem(workPackageId, null, "workItem", "Changed package", 1),
+                WorkItem(taskAId, workPackageId, "task", "Task A", 1),
+                WorkItem(taskBId, workPackageId, "task", "Task B", 2)
+            },
+            dependencies = new[] { new { predecessorTaskId = taskAId, successorTaskId = taskAId, dependencyType = "FS", lagDays = 0 } }
+        });
+        Assert.Equal(HttpStatusCode.Conflict, invalid.StatusCode);
+
+        using var schedule = JsonDocument.Parse(await client.GetStringAsync($"/api/projects/{projectId}/schedule"));
+        var data = schedule.RootElement.GetProperty("data");
+        Assert.Contains(data.GetProperty("workItems").EnumerateArray(), row =>
+            row.GetProperty("id").GetGuid() == workPackageId && row.GetProperty("name").GetString() == "Original package");
+        var taskA = data.GetProperty("workItems").EnumerateArray().Single(row => row.GetProperty("id").GetGuid() == taskAId);
+        Assert.Equal("m", taskA.GetProperty("unit").GetString());
+        Assert.Equal(12.5m, taskA.GetProperty("quantity").GetDecimal());
+        Assert.Equal(25m, taskA.GetProperty("progress").GetDecimal());
+        Assert.Equal(1.25m, taskA.GetProperty("machineShiftFactor").GetDecimal());
+        Assert.Equal(3.5m, taskA.GetProperty("nclm").GetDecimal());
+        Assert.Equal(2m, taskA.GetProperty("permanentLabor").GetDecimal());
+        var dependency = Assert.Single(data.GetProperty("dependencies").EnumerateArray());
+        Assert.Equal(taskAId, dependency.GetProperty("predecessorTaskId").GetGuid());
+        Assert.Equal(taskBId, dependency.GetProperty("successorTaskId").GetGuid());
+    }
+
     private static async Task<Guid> CreateWorkItem(HttpClient client, Guid projectId, Guid? parentId, string type, string name, int sortOrder)
     {
         var response = await client.PostAsJsonAsync($"/api/projects/{projectId}/work-items", new

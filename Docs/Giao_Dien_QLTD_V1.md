@@ -407,7 +407,11 @@ type TaskDependency = {
 - Kéo trực tiếp TaskBar tạo `FS 0`; Dependency Editor cho sửa đủ `FS`, `SS`, `FF`, `SF`.
 - TaskGrid, Dependency Editor và Gantt Dependency Layer dùng chung một danh sách `TaskDependency`.
 - Dữ liệu công tác và dependency nằm trong cùng `ScheduleState`, sử dụng chung cơ chế Undo/Redo.
-- Prototype hiện chưa có backend/schema tiến độ chính thức nên chưa tạo migration. Khi có backend phải ánh xạ model trên vào schema đã chốt.
+- Persistence tiến độ chính thức dùng `Project`, `WorkItem` và `TaskDependency` qua ASP.NET Core/EF Core. Frontend tải và lưu theo từng dự án bằng `GET/PUT /api/projects/{projectId}/schedule`; một lần bấm **Lưu thay đổi** là application boundary và mỗi dự án được lưu trong một transaction riêng.
+- `WorkItem` lưu dữ liệu nguồn: ID, ProjectId, ParentId, ItemType, SortOrder, Name, Unit, Quantity, Duration, StartDate, FinishDate, ProgressPercent, MachineShiftFactor, Nclm, PermanentLabor và timestamp.
+- `TaskDependency` lưu ID thật của predecessor/successor, loại FS/SS/FF/SF và LagDays. Không lưu chuỗi rút gọn theo STT.
+- STT, WBS hiển thị, ngày/thời lượng summary, trạng thái dẫn xuất, sản lượng/ngày, hình học Gantt và connector đều được tính lại từ dữ liệu tải về; không lưu như dữ liệu nguồn.
+- SLM và các cấu trúc Dự toán/Nguồn lực chi tiết chưa được triển khai trong iteration persistence này. SQLite là database development; PostgreSQL là provider mục tiêu production.
 
 #### 10.4.2. Cột Trước — Predecessors
 

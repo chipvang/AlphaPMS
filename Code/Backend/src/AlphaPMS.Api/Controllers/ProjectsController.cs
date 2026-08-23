@@ -6,7 +6,7 @@ namespace AlphaPMS.Api.Controllers;
 [ApiController]
 [Route("api/projects")]
 public sealed class ProjectsController(ProjectService projectService, WorkItemService workItemService,
-    DependencyService dependencyService) : ControllerBase
+    DependencyService dependencyService, ProjectScheduleService scheduleService) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetProjects(CancellationToken cancellationToken) => Ok(new { data = await projectService.GetProjectsAsync(cancellationToken) });
@@ -44,4 +44,10 @@ public sealed class ProjectsController(ProjectService projectService, WorkItemSe
     [HttpPut("{projectId:guid}/dependencies")]
     public async Task<IActionResult> ReplaceDependencies(Guid projectId, ReplaceDependenciesInput input, CancellationToken cancellationToken) =>
         Ok(new { data = await dependencyService.ReplaceProjectDependenciesAsync(projectId, input, cancellationToken) });
+    [HttpGet("{projectId:guid}/schedule")]
+    public async Task<IActionResult> GetSchedule(Guid projectId, CancellationToken cancellationToken) =>
+        Ok(new { data = await scheduleService.GetAsync(projectId, cancellationToken) });
+    [HttpPut("{projectId:guid}/schedule")]
+    public async Task<IActionResult> SaveSchedule(Guid projectId, ProjectScheduleInput input, CancellationToken cancellationToken) =>
+        Ok(new { data = await scheduleService.SaveAsync(projectId, input, cancellationToken) });
 }

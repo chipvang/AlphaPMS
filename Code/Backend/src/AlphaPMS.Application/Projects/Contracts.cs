@@ -24,3 +24,9 @@ public sealed record TaskDependencyDto(Guid Id, Guid ProjectId, Guid Predecessor
 public sealed record TaskDependencyInput(Guid PredecessorTaskId, Guid SuccessorTaskId, string DependencyType, int LagDays);
 
 public sealed record ReplaceDependenciesInput(IReadOnlyList<TaskDependencyInput> Items);
+
+public sealed record ProjectScheduleInput(IReadOnlyList<WorkItemInput> WorkItems,
+    IReadOnlyList<TaskDependencyInput> Dependencies);
+
+public sealed record ProjectScheduleDto(IReadOnlyList<WorkItemDto> WorkItems,
+    IReadOnlyList<TaskDependencyDto> Dependencies);

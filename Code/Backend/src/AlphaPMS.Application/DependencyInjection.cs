@@ -10,5 +10,6 @@ public static class DependencyInjection
         .AddSingleton<IClock, SystemClock>()
         .AddScoped<ProjectService>()
         .AddScoped<WorkItemService>()
-        .AddScoped<DependencyService>();
+        .AddScoped<DependencyService>()
+        .AddScoped<ProjectScheduleService>();
 }

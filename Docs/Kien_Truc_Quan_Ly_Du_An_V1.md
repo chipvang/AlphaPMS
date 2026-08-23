@@ -76,6 +76,7 @@ API giữ envelope `{ "data": ... }` và lỗi `{ "error": { "code", "message" }
 | GET, POST, PUT | `/api/projects/{projectId}/work-items` | Đọc/tạo/lưu đồng bộ WBS |
 | PUT, PATCH, DELETE | `/api/work-items/{id}` | Sửa/xóa WorkItem |
 | GET, POST, PUT | `/api/projects/{projectId}/dependencies` | Đọc/tạo/lưu đồng bộ dependency |
+| GET, PUT | `/api/projects/{projectId}/schedule` | Đọc/lưu nguyên tử WorkItems và TaskDependencies của một dự án |
 | PUT, PATCH, DELETE | `/api/dependencies/{id}` | Sửa/xóa dependency |
 | GET | `/health` | Kiểm tra backend |
 
@@ -86,6 +87,10 @@ Nút **Lưu thay đổi** vẫn là application boundary: working state và Undo
 Global middleware ánh xạ validation thành 400, not found thành 404, conflict/cycle/duplicate thành 409 và lỗi không dự kiến thành 500; production không trả stack trace. Logging dùng ASP.NET Core.
 
 Test gồm Domain rules; dependency hợp lệ và các trường hợp self/duplicate/cross-project/cycle; integration API trên SQLite file với dispose/restart host rồi đọc lại Project, hierarchy và dependency.
+
+`ProjectScheduleService` là transaction boundary của nút **Lưu thay đổi**. Service xóa quan hệ cũ, áp dụng trạng thái WBS cuối cùng rồi kiểm tra/tạo lại quan hệ trong cùng transaction EF Core. Nếu hierarchy hoặc dependency không hợp lệ, toàn bộ thay đổi của dự án được rollback; dự án khác được lưu bằng transaction riêng. Frontend giữ working state và Undo/Redo, chỉ gửi trạng thái cuối khi người dùng bấm Lưu.
+
+Không bổ sung migration trong iteration hoàn thiện persistence vì schema `work_items` và `task_dependencies` hiện tại đã có đủ field nguồn. Optimistic concurrency nhiều người dùng chưa triển khai; `UpdatedAt` tiếp tục được cập nhật theo transaction hiện tại và là điểm mở rộng sau này.
 
 ## 7. Phạm vi mở rộng
 
