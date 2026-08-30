@@ -960,7 +960,7 @@ button {
 
 .schedule-board-shell {
   display: grid;
-  grid-template-rows: 30px 74px minmax(0, 1fr) 17px;
+  grid-template-rows: 30px 74px minmax(0, 1fr);
   min-height: 0;
   flex: 1 1 0
 }
@@ -1012,6 +1012,7 @@ button {
 }
 
 .schedule-board-body {
+  grid-template-rows: minmax(0, 1fr) 17px;
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
@@ -1022,6 +1023,7 @@ button {
 }
 
 .schedule-table-pane {
+  grid-row: 1 / span 2;
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden
@@ -1241,22 +1243,16 @@ button {
 }
 
 .gantt-scrollbar-row {
-  display: grid;
-  grid-template-columns: min(var(--schedule-table-width, 928px), calc(100% - 320px)) minmax(320px, 1fr);
-  min-width: 0;
-  height: 17px;
-  padding-right: 17px
+  display: contents
 }
 
 .gantt-scrollbar-spacer {
-  border-right: 1px solid var(--line-strong);
-  border-bottom: 1px solid var(--line);
-  border-left: 1px solid var(--line);
-  border-radius: 0 0 0 8px;
-  background: var(--surface-soft)
+  display: none
 }
 
 .gantt-scrollbar-dock {
+  grid-column: 2;
+  grid-row: 2;
   min-width: 0;
   height: 17px;
   overflow-x: scroll;

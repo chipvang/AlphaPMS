@@ -1504,7 +1504,6 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
           </div> : <div className="gantt-empty">Chọn dự án để tạo lịch Gantt.</div>}
         </div>
       </div>
-    </div>
     <div className="gantt-scrollbar-row" aria-hidden="true">
       <div className="gantt-scrollbar-spacer" />
       <div ref={ganttBottomScrollRef} className="gantt-scrollbar-dock" onScroll={(event) => {
@@ -1513,6 +1512,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
         const header = ganttHeaderScrollRef.current;
         if (header && Math.abs(header.scrollLeft - event.currentTarget.scrollLeft) > 1) header.scrollLeft = event.currentTarget.scrollLeft;
       }}><div className="gantt-scrollbar-content" style={{ width: timeline?.width ?? 0 }} /></div>
+    </div>
     </div>
     </div>
 
