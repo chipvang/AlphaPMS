@@ -698,7 +698,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     if (ganttHeaderScrollRef.current) ganttHeaderScrollRef.current.scrollLeft = 0;
     if (ganttBottomScrollRef.current) ganttBottomScrollRef.current.scrollLeft = 0;
   }, [timelineStartTime, visibleProjectKey]);
-  const basicColumnWidths = [50, 116, taskNameColumnWidth];
+  const basicColumnWidths = [50, 75, taskNameColumnWidth];
   const scheduleColumnWidths = [74, 92, 92, 50, 115];
   const estimateColumnWidths = [60, 86, 100];
   const resourceColumnWidths = [50, 50, 60, 60];

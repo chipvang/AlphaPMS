@@ -1048,7 +1048,7 @@ button {
 
 .schedule-table-grid {
   display: grid;
-  grid-template-columns: var(--schedule-grid-template, 50px 116px var(--schedule-name-width, 350px) 74px 70px 70px 50px 96px);
+  grid-template-columns: var(--schedule-grid-template, 50px 75px var(--schedule-name-width, 350px) 74px 70px 70px 50px 96px);
   width: var(--schedule-table-width, 750px)
 }
 
@@ -1946,9 +1946,16 @@ button {
   grid-template-columns: repeat(4, 16px);
   grid-template-rows: 16px;
   align-items: center;
-  justify-content: end;
+  justify-content: center;
   column-gap: 1px;
-  width: 100%
+  width: 100%;
+  min-width: 75px;
+  padding: 0 4px;
+  box-sizing: border-box
+}
+
+.schedule-row > div.row-actions {
+  padding: 0 4px;
 }
 
 .row-actions button {
@@ -2003,6 +2010,22 @@ button {
 .row-actions .action-slot-insert-above { grid-column: 2; }
 .row-actions .action-slot-insert-below { grid-column: 3; }
 .row-actions .action-slot-delete { grid-column: 4; }
+
+.schedule-row.row-task .row-actions::before {
+  content: "";
+  grid-column: 1;
+  width: 16px;
+  height: 16px;
+  pointer-events: none
+}
+
+.schedule-row.row-task .row-actions {
+  transform: none
+}
+
+.schedule-row.row-task .row-actions button {
+  transform: translateX(1px)
+}
 
 .row-actions .action-triangle {
   font-size: 9px;
