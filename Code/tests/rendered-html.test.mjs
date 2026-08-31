@@ -74,7 +74,7 @@ test("keeps the committed schedule interaction contract", async () => {
   assert.match(page, /commonDialog\.confirm/);
   assert.doesNotMatch(page, /globalThis\.confirm|window\.confirm/);
   assert.match(page, /const minimumTaskNameColumnWidth = 350/);
-  assert.match(page, /const scheduleColumnWidths = \[74, 70, 70, 50, 96\]/);
+  assert.match(page, /const scheduleColumnWidths = \[74, 92, 92, 50, 115\]/);
   assert.match(css, /\.duration-cell input \{[\s\S]*width:\s*50px/);
   assert.match(page, /quan hệ công việc liên quan/);
   assert.match(page, /current\.dependencies\.filter/);
@@ -90,7 +90,7 @@ test("keeps the committed schedule interaction contract", async () => {
   assert.match(page, /gridColumn: "span 5"[^\n]*>Tiến độ<\/div>/);
   assert.match(page, />Sản lượng\/ngày<\/div>/);
   assert.match(page, /const basicColumnWidths = \[50, 116, taskNameColumnWidth\]/);
-  assert.match(page, /const scheduleColumnWidths = \[74, 70, 70, 50, 96\]/);
+  assert.match(page, /const scheduleColumnWidths = \[74, 92, 92, 50, 115\]/);
   assert.match(page, /const estimateColumnWidths = \[60, 86, 100\]/);
   assert.match(page, /const resourceColumnWidths = \[50, 50, 60, 60\]/);
   assert.match(page, /<div>HSM<\/div><div>SLM<\/div><div>NCLM<\/div><div>NCCH<\/div>/);
@@ -115,7 +115,7 @@ test("keeps the committed schedule interaction contract", async () => {
   assert.match(dependencies, /createsDependencyCycle/);
   assert.match(dependencies, /predecessor\.projectId !== successor\.projectId/);
   assert.match(css, /\.gantt-scrollbar-dock/);
-  assert.match(css, /grid-template-rows:\s*30px 74px minmax\(0, 1fr\) 17px/);
+  assert.match(css, /grid-template-rows:\s*30px 74px minmax\(0, 1fr\)/);
   assert.match(css, /\.schedule-board-body/);
   assert.match(css, /\.summary-workItem/);
   assert.match(css, /\.summary-group/);
@@ -147,7 +147,7 @@ test("uses the ASP.NET Core API for Project, WBS and dependency production data"
 });
 
 test("auto-schedules FS, SS, FF and SF dependencies through a DAG", async () => {
-  const { calculateDependencyConstraint, calculateFsRequiredStart, propagateDependencySchedule } = await import(new URL("../lib/schedule/dependencies.ts", import.meta.url).href);
+  const { calculateDependencyConstraint, calculateDependencyLag, calculateFsRequiredStart, propagateDependencySchedule, recalibrateIncomingDependencyLags } = await import(new URL("../lib/schedule/dependencies.ts", import.meta.url).href);
   const task = (id, startDate, finishDate, duration = 5) => ({ id, projectId: "p1", type: "task", startDate, finishDate, duration });
   const a = task("a", "01/08/26", "10/08/26", 10);
   const b = task("b", "20/08/26", "24/08/26");
@@ -155,7 +155,7 @@ test("auto-schedules FS, SS, FF and SF dependencies through a DAG", async () => 
   const finish = new Date("2026-08-07T00:00:00.000Z");
   assert.equal(calculateFsRequiredStart(finish, 0).toISOString().slice(0, 10), "2026-08-08");
   assert.equal(calculateFsRequiredStart(finish, 1).toISOString().slice(0, 10), "2026-08-09");
-  assert.equal(calculateFsRequiredStart(finish, -1).toISOString().slice(0, 10), "2026-08-06");
+  assert.equal(calculateFsRequiredStart(finish, -1).toISOString().slice(0, 10), "2026-08-07");
   assert.equal(calculateDependencyConstraint(a, 5, "FS", 0).toISOString().slice(0, 10), "2026-08-11");
   assert.equal(calculateDependencyConstraint(a, 5, "SS", 2).toISOString().slice(0, 10), "2026-08-03");
   assert.equal(calculateDependencyConstraint(a, 5, "FF", 0).toISOString().slice(0, 10), "2026-08-06");
@@ -174,7 +174,17 @@ test("auto-schedules FS, SS, FF and SF dependencies through a DAG", async () => 
     { id: "ab", projectId: "p1", predecessorTaskId: "a", successorTaskId: "b", dependencyType: "FS", lag: 0 },
     { id: "late-b", projectId: "p1", predecessorTaskId: "late", successorTaskId: "b", dependencyType: "FS", lag: -1 },
   ], ["a", "late"]);
-  assert.equal(multi.find((item) => item.id === "b").startDate, "19/08/26");
+  assert.equal(multi.find((item) => item.id === "b").startDate, "20/08/26");
+
+  const fsSuccessor = task("fs-successor", "09/09/26", "11/09/26", 3);
+  const ffSuccessor = task("ff-successor", "10/09/26", "12/09/26", 3);
+  const septemberPredecessor = task("september-predecessor", "01/09/26", "07/09/26", 7);
+  assert.equal(calculateDependencyLag(septemberPredecessor, fsSuccessor, "FS"), 1);
+  assert.equal(calculateDependencyLag(septemberPredecessor, fsSuccessor, "SS"), 8);
+  assert.equal(calculateDependencyLag(septemberPredecessor, ffSuccessor, "FF"), 5);
+  assert.equal(calculateDependencyLag(septemberPredecessor, ffSuccessor, "SF"), 11);
+  const recalibrated = recalibrateIncomingDependencyLags([septemberPredecessor, fsSuccessor], [{ id: "fs", projectId: "p1", predecessorTaskId: "september-predecessor", successorTaskId: "fs-successor", dependencyType: "FS", lag: 0 }], "fs-successor", { start: true, finish: false });
+  assert.equal(recalibrated[0].lag, 1);
 });
 
 test("validates task dependencies by stable task ids", async () => {

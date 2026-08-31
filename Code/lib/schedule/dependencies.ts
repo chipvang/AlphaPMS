@@ -89,9 +89,46 @@ function addScheduleDays(date: Date, days: number) {
   return result;
 }
 
+function differenceInScheduleDays(later: Date, earlier: Date) {
+  return Math.round((later.getTime() - earlier.getTime()) / 86_400_000);
+}
+
 export function calculateFsRequiredStart(predecessorFinish: Date, lag: number) {
-  const normalizedLag = Math.trunc(lag);
-  return addScheduleDays(predecessorFinish, normalizedLag < 0 ? normalizedLag : normalizedLag + 1);
+  return addScheduleDays(predecessorFinish, Math.trunc(lag) + 1);
+}
+
+export function calculateDependencyLag(
+  predecessor: ScheduledDependencyTask,
+  successor: ScheduledDependencyTask,
+  dependencyType: DependencyType,
+) {
+  const predecessorStart = parseScheduleDate(predecessor.startDate);
+  const predecessorFinish = parseScheduleDate(predecessor.finishDate);
+  const successorStart = parseScheduleDate(successor.startDate);
+  const successorFinish = parseScheduleDate(successor.finishDate);
+  if (!predecessorStart || !predecessorFinish || !successorStart || !successorFinish) return null;
+  if (dependencyType === "FS") return differenceInScheduleDays(successorStart, predecessorFinish) - 1;
+  if (dependencyType === "SS") return differenceInScheduleDays(successorStart, predecessorStart);
+  if (dependencyType === "FF") return differenceInScheduleDays(successorFinish, predecessorFinish);
+  return differenceInScheduleDays(successorFinish, predecessorStart);
+}
+
+export function recalibrateIncomingDependencyLags<T extends ScheduledDependencyTask>(
+  tasks: T[],
+  dependencies: TaskDependency[],
+  successorTaskId: string,
+  changedEndpoints: { start: boolean; finish: boolean },
+) {
+  const tasksById = new Map(tasks.map((task) => [task.id, task]));
+  return dependencies.map((dependency) => {
+    if (dependency.successorTaskId !== successorTaskId) return dependency;
+    const usesStart = dependency.dependencyType === "FS" || dependency.dependencyType === "SS";
+    if ((usesStart && !changedEndpoints.start) || (!usesStart && !changedEndpoints.finish)) return dependency;
+    const predecessor = tasksById.get(dependency.predecessorTaskId);
+    const successor = tasksById.get(dependency.successorTaskId);
+    const lag = predecessor && successor ? calculateDependencyLag(predecessor, successor, dependency.dependencyType) : null;
+    return lag == null || lag === dependency.lag ? dependency : { ...dependency, lag };
+  });
 }
 
 export function calculateDependencyConstraint(

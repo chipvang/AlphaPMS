@@ -218,11 +218,13 @@ Các cột nhập nhanh hỗ trợ inline edit theo nguyên tắc:
 - Khi thay đổi thời lượng, ngày bắt đầu được giữ nguyên và ngày kết thúc được tính lại theo ngày lịch: `finish_date = start_date + duration - 1` vì ngày bắt đầu được tính là ngày làm việc thứ nhất.
 - Khi thay đổi thời lượng, chiều rộng thanh Gantt của dòng được co giãn theo tỷ lệ thời lượng mới; vị trí bắt đầu giữ nguyên.
 - Nhấn `Enter` trong ô thời lượng xác nhận giá trị và kết thúc trạng thái edit ngay, không cần đưa chuột ra ngoài ô.
-- **Bắt đầu/Kết thúc**: luôn hiển thị và bắt buộc nhập theo `dd/MM/yy`. Người dùng có thể nhập trực tiếp hoặc bấm nút lịch nhỏ chỉ xuất hiện khi hover/focus.
+- **Bắt đầu/Kết thúc**: luôn hiển thị và bắt buộc nhập theo `dd/MM/yy`. Ô nhập chia thành ba phần ngày/tháng/năm; nhập đủ hai số ngày tự chuyển sang tháng, đủ hai số tháng tự chuyển sang năm. Dấu `/` hoặc `.` chuyển ngay sang phần kế tiếp, nên có thể gõ `7/9` rồi `Enter`. Không cần quét toàn bộ text; mũi tên trái/phải và Backspace chuyển giữa các phần, `Enter` xác nhận, `Escape` hủy. Khi thiếu năm, giữ năm cũ hoặc dùng năm hiện tại nếu chưa có giá trị.
+- Nút lịch tiếng Việt chỉ hiện khi hover/focus, dùng icon 16px đặt sát mép phải và không che chữ ngày; cột Bắt đầu/Kết thúc rộng 92px.
+- Ô Bắt đầu/Kết thúc của Project, WorkPackage, Group và Task đều căn trái với cùng padding, line-height và định dạng `dd/MM/yy`, nên các ngày thẳng cột dọc.
 - Bộ chọn ngày dùng giao diện tiếng Việt do AlphaPMS quản lý, gồm tiêu đề `Tháng ... năm ...`, thứ `T2–CN`, điều hướng tháng trước/sau và nút **Hôm nay**; không phụ thuộc ngôn ngữ lịch native của trình duyệt.
 - Ngày không hợp lệ, ngày không tồn tại hoặc sai định dạng không được ghi nhận; hệ thống trả lại giá trị trước và thông báo lỗi.
-- Khi thay đổi ngày bắt đầu hoặc ngày kết thúc, hệ thống giữ nguyên đầu mốc còn lại và tính lại thời lượng theo công thức bao gồm cả hai đầu mốc: `duration = finish_date - start_date + 1`.
-- Ngày kết thúc không được trước ngày bắt đầu. Thay đổi không hợp lệ bị từ chối và giữ lại giá trị cũ.
+- Khi sửa **Bắt đầu**: nếu ngày mới không sau Kết thúc cũ thì giữ Kết thúc và tính lại `duration = finish_date - start_date + 1`; nếu ngày mới sau Kết thúc cũ thì giữ thời lượng cũ và dịch Kết thúc theo `finish_date = start_date + duration - 1`.
+- Khi sửa **Kết thúc**, giữ Bắt đầu và tính lại thời lượng; Kết thúc trước Bắt đầu bị từ chối và giữ lại giá trị cũ.
 - Sau khi tính lại thời lượng, chiều rộng thanh Gantt của dòng được cập nhật theo cùng tỷ lệ ngày; vị trí bắt đầu của thanh Gantt giữ nguyên.
 - Không đặt spinner ngày thường trực vì làm tăng nhiễu thị giác và nguy cơ thay đổi nhầm dữ liệu.
 - Mỗi lần xác nhận sửa tên/ngày là một bước Undo/Redo; các lần tăng giảm thời lượng liên tiếp được phép gộp thành một bước.
@@ -230,7 +232,7 @@ Các cột nhập nhanh hỗ trợ inline edit theo nguyên tắc:
 ### 8.2. Mật độ hiển thị cột
 
 - Độ rộng chính thức: Cơ bản = STT 50px, Tác vụ 116px, Tên công việc 415px; tổng 581px.
-- Tiến độ = Thời lượng 64px, Bắt đầu 70px, Kết thúc 70px, Trước 50px, Tình trạng 96px; tổng 350px.
+- Tiến độ = Thời lượng 74px, Bắt đầu 92px, Kết thúc 92px, Trước 50px, Tình trạng 115px; tổng 423px.
 - Cột Tên công việc có `min-width: 350px`, vẫn được phép resize rộng hơn. Ô nhập Thời lượng rộng `30px`, giữ suffix “ngày” trên cùng một dòng.
 - Dự toán = Đơn vị 60px, Khối lượng 86px, Sản lượng/ngày 100px; tổng 246px.
 - Nguồn lực = HSM 50px, SLM 50px, NCLM 60px, NCCH 60px; tổng 220px.
@@ -462,7 +464,9 @@ Tạo bằng kéo, thêm/sửa/xóa bằng editor, đổi FS/SS/FF/SF, đổi la
 #### 10.4.7. Auto Schedule theo dependency
 
 - Logic đặt trong helper nghiệp vụ `lib/schedule/dependencies.ts`, độc lập với component React.
-- Mọi dependency được quy đổi thành constraint lên ngày bắt đầu của successor. Riêng FS dùng quy tắc chính thức: `FS0 = predecessor.finish + 1 ngày`; khi `lag > 0`, `requiredStart = finish + 1 + lag`; khi `lag < 0`, `requiredStart = finish + lag`. Ví dụ Finish `07/08/26`: FS0 → `08/08/26`, FS+1 → `09/08/26`, FS-1 → `06/08/26`. Các công thức SS/FF/SF giữ nguyên implementation hiện tại.
+- Direct edit của người dùng là authoritative: sau khi đổi ngày, chỉ **incoming dependency** của Task được recalibrate trong cùng một bước Undo/Redo, trước khi Auto Schedule lan xuống successor. Sửa Start recalibrate FS/SS; FF/SF chỉ recalibrate khi Finish cũng đổi do dịch toàn bộ Task. Sửa Finish recalibrate FF/SF. Auto Schedule không recalibrate quan hệ khi tự dịch successor.
+- Lag/lead là chênh lệch ngày lịch: FS = `successor.start - (predecessor.finish + 1)`; SS = `successor.start - predecessor.start`; FF = `successor.finish - predecessor.finish`; SF = `successor.finish - predecessor.start`. Chênh lệch dương là lag, âm là lead. Với Finish predecessor `04/09`: FS-2 → `03/09`, FS-1 → `04/09`, FS0 → `05/09`, FS+2 → `07/09`.
+- Mọi dependency được quy đổi thành constraint lên ngày bắt đầu của successor: FS = `predecessor.finish + 1 + lag`; SS = `predecessor.start + lag`; FF/SF lấy mốc finish tương ứng rồi trừ `duration - 1` để ra start.
 - Nếu có nhiều predecessor, successor lấy ngày bắt đầu lớn nhất trong toàn bộ constraint. Không lấy ngày nhập tay cũ làm giới hạn.
 - Duration của successor được giữ nguyên; `finish = start + duration - 1`.
 - Thay đổi ngày predecessor, tạo/sửa/xóa quan hệ sẽ lan truyền theo thứ tự topo xuống toàn bộ successor trong DAG.

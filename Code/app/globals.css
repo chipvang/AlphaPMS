@@ -1013,25 +1013,42 @@ button {
 
 .schedule-board-body {
   grid-template-rows: minmax(0, 1fr) 17px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
+  overflow: hidden;
   min-height: 0;
   border-right: 1px solid var(--line);
   border-left: 1px solid var(--line);
   background: var(--surface)
 }
 
-.schedule-table-pane {
-  grid-row: 1 / span 2;
+.schedule-board-scroll {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: min(var(--schedule-table-width, 928px), calc(100% - 320px)) minmax(320px, 1fr);
   min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable
+}
+
+.schedule-table-pane {
+  min-width: 0;
+  height: max-content;
+  min-height: 100%;
   overflow-x: auto;
-  overflow-y: hidden
+  overflow-y: hidden;
+  scrollbar-width: none
+}
+
+.schedule-table-pane::-webkit-scrollbar {
+  width: 0;
+  height: 0
 }
 
 .schedule-table-grid {
   display: grid;
-  grid-template-columns: var(--schedule-grid-template, 50px 116px var(--schedule-name-width, 415px) 74px 70px 70px 50px 96px);
+  grid-template-columns: var(--schedule-grid-template, 50px 116px var(--schedule-name-width, 350px) 74px 70px 70px 50px 96px);
   width: var(--schedule-table-width, 750px)
 }
 
@@ -1225,6 +1242,7 @@ button {
 
 .gantt-pane {
   min-width: 0;
+  min-height: 100%;
   border-left: 1px solid var(--line-strong);
   background: var(--surface)
 }
@@ -1243,20 +1261,34 @@ button {
 }
 
 .gantt-scrollbar-row {
-  display: contents
-}
-
-.gantt-scrollbar-spacer {
-  display: none
-}
-
-.gantt-scrollbar-dock {
-  grid-column: 2;
+  grid-column: 1 / -1;
   grid-row: 2;
+  display: grid;
+  grid-template-columns: min(var(--schedule-table-width, 928px), calc(100% - 320px)) minmax(320px, 1fr);
+  min-width: 0;
+  padding-right: 15px
+}
+
+.task-grid-scrollbar-dock,
+.gantt-scrollbar-dock {
   min-width: 0;
   height: 17px;
   overflow-x: scroll;
   overflow-y: hidden;
+  background: var(--surface-soft);
+  scrollbar-color: var(--line-strong) var(--surface-soft);
+  scrollbar-width: auto
+}
+
+.task-grid-scrollbar-dock {
+  grid-column: 1;
+  border-right: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0 0 0 8px
+}
+
+.gantt-scrollbar-dock {
+  grid-column: 2;
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   border-radius: 0 0 8px 0;
@@ -1265,25 +1297,33 @@ button {
   scrollbar-width: auto
 }
 
+.task-grid-scrollbar-dock::-webkit-scrollbar,
 .gantt-scrollbar-dock::-webkit-scrollbar {
   height: 16px
 }
 
+.task-grid-scrollbar-dock::-webkit-scrollbar-track,
 .gantt-scrollbar-dock::-webkit-scrollbar-track {
   background: var(--surface-soft)
 }
 
+.task-grid-scrollbar-dock::-webkit-scrollbar-thumb,
 .gantt-scrollbar-dock::-webkit-scrollbar-thumb {
   border: 3px solid var(--surface-soft);
   border-radius: 8px;
   background: var(--line-strong)
 }
 
+.task-grid-scrollbar-dock::-webkit-scrollbar-thumb:hover,
 .gantt-scrollbar-dock::-webkit-scrollbar-thumb:hover {
   background: var(--muted)
 }
 
 .gantt-scrollbar-content {
+  height: 1px
+}
+
+.task-grid-scrollbar-content {
   height: 1px
 }
 
@@ -1442,6 +1482,7 @@ button {
 }
 
 .inline-name-value {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1450,9 +1491,11 @@ button {
 }
 
 .inline-name-input {
+  flex: 1 1 auto;
   width: 100%;
   min-width: 0;
-  height: 25px;
+  align-self: stretch;
+  height: 100%;
   padding: 2px 5px;
   border: 1px solid var(--primary);
   border-radius: 4px;
@@ -1534,7 +1577,32 @@ button {
 }
 
 .date-cell {
-  padding: 4px 3px !important
+  justify-content: flex-start;
+  padding: 4px 3px !important;
+  color: var(--text);
+  font-weight: 400;
+  line-height: 24px;
+  text-align: left
+}
+
+.date-cell.summary-value {
+  justify-content: flex-start
+}
+
+.date-cell.summary-value>span {
+  width: 100%;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  padding: 2px 0;
+  border: 1px solid transparent;
+  color: inherit;
+  font-weight: inherit;
+  line-height: inherit
+}
+
+.date-cell .inline-date-mask {
+  padding-left: 0
 }
 
 .predecessor-cell {
@@ -1565,60 +1633,174 @@ button {
   color: var(--primary-dark)
 }
 
+.schedule-status-cell {
+  justify-content: flex-start;
+  padding: 4px 5px !important
+}
+
+.schedule-status-chip {
+  width: 100%;
+  min-width: 0;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  background: var(--status-background);
+  color: var(--status-color);
+  font-size: var(--ui-min-font-size);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap
+}
+
+.schedule-status-chip svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6
+}
+
+.schedule-status-chip.status-in-progress svg {
+  stroke-width: 1.7
+}
+
+.schedule-status-chip>span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+
+.schedule-status-chip.status-not-started {
+  --status-background: #f3f4f6;
+  --status-color: #6b7280;
+  border-color: #e5e7eb
+}
+
+.schedule-status-chip.status-in-progress {
+  --status-background: #eff6ff;
+  --status-color: #2563eb;
+  border-color: #bfdbfe
+}
+
+.schedule-status-chip.status-completed {
+  --status-background: #ecfdf5;
+  --status-color: #16a34a;
+  border-color: #a7f3d0
+}
+
+.schedule-status-chip.status-paused {
+  --status-background: #fffbeb;
+  --status-color: #f59e0b;
+  border-color: #fde68a
+}
+
+.schedule-status-chip.status-on-hold {
+  --status-background: #f5f3ff;
+  --status-color: #7c3aed;
+  border-color: #ddd6fe
+}
+
+.schedule-status-chip.status-cancelled {
+  --status-background: #fef2f2;
+  --status-color: #dc2626;
+  border-color: #fecaca
+}
+
 .inline-date-editor {
   position: relative;
   width: 100%;
-  min-width: 0
+  min-width: 0;
+  height: 24px
 }
 
-.inline-date-text {
+.inline-date-mask {
   width: 100%;
   height: 24px;
-  padding: 2px 3px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1px;
+  padding: 2px 24px 2px 3px;
   border: 1px solid transparent;
   border-radius: 4px;
-  outline: 0;
   background: transparent;
   color: inherit;
-  text-align: center;
   font-size: inherit;
   font-variant-numeric: tabular-nums
 }
 
-.inline-date-editor:hover .inline-date-text,
-.inline-date-text:focus {
+.inline-date-editor:hover .inline-date-mask,
+.inline-date-editor:focus-within .inline-date-mask {
   border-color: var(--line-strong);
   background: var(--surface)
 }
 
-.inline-date-text:focus {
+.inline-date-editor:focus-within .inline-date-mask {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px var(--focus-ring)
 }
 
+.inline-date-part {
+  width: 16px;
+  min-width: 0;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  text-align: center;
+  font: inherit;
+  font-variant-numeric: tabular-nums
+}
+
+.inline-date-part:last-child {
+  width: 18px
+}
+
 .inline-date-button {
   position: absolute;
-  top: 3px;
-  right: 2px;
-  width: 18px;
-  height: 18px;
-  display: none;
+  top: 2px;
+  right: 3px;
+  width: 20px;
+  height: 20px;
+  display: grid;
   place-items: center;
   padding: 0;
   border: 0;
   border-radius: 3px;
   background: transparent;
   color: var(--primary-dark);
-  font-size: var(--ui-min-font-size)
+  opacity: 0;
+  pointer-events: none
 }
 
 .inline-date-editor:hover .inline-date-button,
 .inline-date-editor:focus-within .inline-date-button {
-  display: grid
+  opacity: 1;
+  pointer-events: auto
 }
 
 .inline-date-button:hover {
   background: var(--primary-soft)
+}
+
+.inline-date-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4
 }
 
 .vi-calendar {
@@ -1830,6 +2012,11 @@ button {
 .task-name {
   gap: 5px;
   overflow: hidden
+}
+
+.task-name.is-editing {
+  gap: 5px;
+  padding-right: 3px !important
 }
 
 .task-context-menu {

@@ -1,16 +1,49 @@
 "use client";
 
-import { CSSProperties, FormEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, FormEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useUndoRedo } from "../lib/history/useUndoRedo";
 import type { ProjectDto, ProjectInput, ProjectScheduleDto, WorkItemDto } from "../lib/projects/types";
-import { DependencyType, formatDependencyLabel, propagateDependencySchedule, TaskDependency, validateTaskDependency } from "../lib/schedule/dependencies";
+import { DependencyType, formatDependencyLabel, propagateDependencySchedule, recalibrateIncomingDependencyLags, TaskDependency, validateTaskDependency } from "../lib/schedule/dependencies";
 import { buildTreeInsertionSlots, moveTreeItemToSlot, TreeInsertionSlot } from "../lib/schedule/treeReorder";
 import { convertTaskToGroupWithFollowingTasks } from "../lib/schedule/taskConversion";
 import { useCommonDialog } from "../lib/ui/useCommonDialog";
 
 type Project = ProjectDto;
 type ProjectStatus = ProjectDto["status"];
+
+type ScheduleDisplayStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "PAUSED" | "ON_HOLD" | "CANCELLED";
+
+const scheduleStatusPresentation: Record<ScheduleDisplayStatus, { label: string; icon: "circle" | "play" | "check" | "pause" | "clock" | "cancel" }> = {
+  NOT_STARTED: { label: "Chưa thi công", icon: "circle" },
+  IN_PROGRESS: { label: "Đang thi công", icon: "play" },
+  COMPLETED: { label: "Hoàn thành", icon: "check" },
+  PAUSED: { label: "Tạm dừng", icon: "pause" },
+  ON_HOLD: { label: "Chờ thực hiện", icon: "clock" },
+  CANCELLED: { label: "Không thực hiện", icon: "cancel" },
+};
+
+function getProjectScheduleStatus(status: ProjectStatus | undefined): ScheduleDisplayStatus {
+  if (status === "Đang thực hiện") return "IN_PROGRESS";
+  if (status === "Hoàn thành") return "COMPLETED";
+  if (status === "Tạm dừng") return "PAUSED";
+  return "ON_HOLD";
+}
+
+function ScheduleStatusChip({ status }: { status: ScheduleDisplayStatus }) {
+  const presentation = scheduleStatusPresentation[status];
+  return <span className={`schedule-status-chip status-${status.toLowerCase().replaceAll("_", "-")}`} title={presentation.label} aria-label={`Tình trạng: ${presentation.label}`}>
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      {presentation.icon === "circle" && <circle cx="8" cy="8" r="5.25" />}
+      {presentation.icon === "play" && <path d="m5.25 3.5 7 4.5-7 4.5z" />}
+      {presentation.icon === "check" && <><circle cx="8" cy="8" r="5.5" /><path d="m5.2 8.1 1.8 1.9 3.8-4" /></>}
+      {presentation.icon === "pause" && <><path d="M5.3 4v8M10.7 4v8" /></>}
+      {presentation.icon === "clock" && <><circle cx="8" cy="8" r="5.5" /><path d="M8 4.8v3.5l2.2 1.3" /></>}
+      {presentation.icon === "cancel" && <><circle cx="8" cy="8" r="5.5" /><path d="m5.9 5.9 4.2 4.2m0-4.2-4.2 4.2" /></>}
+    </svg>
+    <span>{presentation.label}</span>
+  </span>;
+}
 
 const blankProject: ProjectInput = {
   code: "",
@@ -191,6 +224,7 @@ const initialScheduleState: ScheduleState = { items: [], dependencies: [] };
 
 const ganttColumnWidth = 20;
 const minimumTaskNameColumnWidth = 350;
+const maximumTaskNameColumnWidth = 700;
 const scheduleRowHeight = 32;
 
 function isScheduleDescendant(item: ScheduleItem, ancestorId: string, itemMap: Map<string, ScheduleItem>) {
@@ -334,7 +368,7 @@ function getIsoWeek(date: Date) {
   return Math.ceil((((utcDate.getTime() - yearStart.getTime()) / 86_400_000) + 1) / 7);
 }
 
-function InlineNameEditor({ value, autoEdit = false, onCommit }: { value: string; autoEdit?: boolean; onCommit: (value: string) => void }) {
+function InlineNameEditor({ value, autoEdit = false, onCommit, onFinishEditing }: { value: string; autoEdit?: boolean; onCommit: (value: string) => void; onFinishEditing: () => void }) {
   const [isEditing, setIsEditing] = useState(autoEdit);
   const [draftValue, setDraftValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -351,10 +385,11 @@ function InlineNameEditor({ value, autoEdit = false, onCommit }: { value: string
     if (shouldCommit && nextValue && nextValue !== value) onCommit(nextValue);
     else setDraftValue(value);
     setIsEditing(false);
+    onFinishEditing();
   }
 
   if (!isEditing) {
-    return <span className="inline-name-value" title="Bấm kép để sửa" onDoubleClick={(event) => { event.stopPropagation(); setDraftValue(value); setIsEditing(true); }}>{value}</span>;
+    return <span className="inline-name-value" title="Bấm kép để sửa">{value}</span>;
   }
 
   return <input
@@ -373,10 +408,17 @@ function InlineNameEditor({ value, autoEdit = false, onCommit }: { value: string
 }
 
 function InlineDateEditor({ label, value, onCommit, onInvalid }: { label: string; value: string; onCommit: (value: string) => boolean | void; onInvalid: () => void }) {
-  const [draftValue, setDraftValue] = useState(value);
+  const getDateParts = (dateValue: string) => {
+    const match = /^(\d{2})\/(\d{2})\/(\d{2})$/.exec(dateValue);
+    return match ? { day: match[1], month: match[2], year: match[3] } : { day: "", month: "", year: String(new Date().getFullYear() % 100).padStart(2, "0") };
+  };
+  const [dateParts, setDateParts] = useState(() => getDateParts(value));
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarPosition, setCalendarPosition] = useState({ left: 0, top: 0 });
   const [viewMonth, setViewMonth] = useState(() => parseDisplayDate(value) ?? new Date());
+  const dayInputRef = useRef<HTMLInputElement>(null);
+  const monthInputRef = useRef<HTMLInputElement>(null);
+  const yearInputRef = useRef<HTMLInputElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
   const calendarButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -397,24 +439,75 @@ function InlineDateEditor({ label, value, onCommit, onInvalid }: { label: string
     };
   }, [calendarOpen]);
 
+  function draftDateValue() {
+    return `${dateParts.day.padStart(2, "0")}/${dateParts.month.padStart(2, "0")}/${dateParts.year.padStart(2, "0")}`;
+  }
+
   function commitDraft() {
+    const draftValue = draftDateValue();
     if (draftValue === value) return;
     const date = parseDisplayDate(draftValue);
     if (!date) {
-      setDraftValue(value);
+      setDateParts(getDateParts(value));
       onInvalid();
       return;
     }
     const formattedValue = formatDisplayDate(date);
-    setDraftValue(formattedValue);
-    if (onCommit(formattedValue) === false) setDraftValue(value);
+    setDateParts(getDateParts(formattedValue));
+    if (onCommit(formattedValue) === false) setDateParts(getDateParts(value));
+  }
+
+  function focusPart(part: "day" | "month" | "year") {
+    const input = part === "day" ? dayInputRef.current : part === "month" ? monthInputRef.current : yearInputRef.current;
+    input?.focus();
+    input?.select();
+  }
+
+  function updatePart(part: "day" | "month" | "year", rawValue: string) {
+    const nextValue = rawValue.replace(/\D/g, "").slice(0, 2);
+    setDateParts((current) => ({ ...current, [part]: nextValue }));
+    if (nextValue.length !== 2) return;
+    if (part === "day") globalThis.requestAnimationFrame(() => focusPart("month"));
+    if (part === "month") globalThis.requestAnimationFrame(() => focusPart("year"));
+  }
+
+  function handlePartKeyDown(event: ReactKeyboardEvent<HTMLInputElement>, part: "day" | "month" | "year") {
+    event.stopPropagation();
+    const input = event.currentTarget;
+    if (event.key === "Enter") {
+      commitDraft();
+      input.blur();
+      return;
+    }
+    if (event.key === "Escape") {
+      setDateParts(getDateParts(value));
+      input.blur();
+      return;
+    }
+    const previous = part === "year" ? "month" : part === "month" ? "day" : null;
+    const next = part === "day" ? "month" : part === "month" ? "year" : null;
+    if ((event.key === "/" || event.key === ".") && next) {
+      event.preventDefault();
+      focusPart(next);
+      return;
+    }
+    if ((event.key === "ArrowLeft" && input.selectionStart === 0) || (event.key === "Backspace" && !input.value && previous)) {
+      if (previous) {
+        event.preventDefault();
+        focusPart(previous);
+      }
+    }
+    if (event.key === "ArrowRight" && input.selectionStart === input.value.length && next) {
+      event.preventDefault();
+      focusPart(next);
+    }
   }
 
   function openDatePicker() {
     const button = calendarButtonRef.current;
     if (!button) return;
     const rect = button.getBoundingClientRect();
-    const selectedDate = parseDisplayDate(draftValue) ?? new Date();
+    const selectedDate = parseDisplayDate(draftDateValue()) ?? new Date();
     setViewMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
     setCalendarPosition({
       left: Math.max(8, Math.min(rect.right - 252, globalThis.innerWidth - 260)),
@@ -425,8 +518,8 @@ function InlineDateEditor({ label, value, onCommit, onInvalid }: { label: string
 
   function selectCalendarDate(date: Date) {
     const nextValue = formatDisplayDate(date);
-    if (onCommit(nextValue) !== false) setDraftValue(nextValue);
-    else setDraftValue(value);
+    if (onCommit(nextValue) !== false) setDateParts(getDateParts(nextValue));
+    else setDateParts(getDateParts(value));
     setCalendarOpen(false);
   }
 
@@ -442,26 +535,15 @@ function InlineDateEditor({ label, value, onCommit, onInvalid }: { label: string
     return date;
   });
 
-  return <div className="inline-date-editor">
-    <input
-      className="inline-date-text"
-      aria-label={label}
-      inputMode="numeric"
-      maxLength={8}
-      value={draftValue}
-      onClick={(event) => event.stopPropagation()}
-      onChange={(event) => setDraftValue(event.target.value)}
-      onBlur={commitDraft}
-      onKeyDown={(event) => {
-        event.stopPropagation();
-        if (event.key === "Enter") event.currentTarget.blur();
-        if (event.key === "Escape") {
-          setDraftValue(value);
-          event.currentTarget.blur();
-        }
-      }}
-    />
-    <button ref={calendarButtonRef} type="button" className="inline-date-button" title={`Chọn ${label.toLocaleLowerCase("vi")}`} aria-label={`Chọn ${label.toLocaleLowerCase("vi")}`} onMouseDown={(event) => event.preventDefault()} onClick={openDatePicker}>▣</button>
+  return <div className="inline-date-editor" onBlur={(event) => { if (!calendarOpen && !event.currentTarget.contains(event.relatedTarget as Node)) commitDraft(); }}>
+    <div className="inline-date-mask" aria-label={label}>
+      <input ref={dayInputRef} className="inline-date-text inline-date-part" aria-label={`${label} ngày`} inputMode="numeric" maxLength={2} value={dateParts.day} onFocus={(event) => event.currentTarget.select()} onChange={(event) => updatePart("day", event.target.value)} onKeyDown={(event) => handlePartKeyDown(event, "day")} />
+      <span aria-hidden="true">/</span>
+      <input ref={monthInputRef} className="inline-date-text inline-date-part" aria-label={`${label} tháng`} inputMode="numeric" maxLength={2} value={dateParts.month} onFocus={(event) => event.currentTarget.select()} onChange={(event) => updatePart("month", event.target.value)} onKeyDown={(event) => handlePartKeyDown(event, "month")} />
+      <span aria-hidden="true">/</span>
+      <input ref={yearInputRef} className="inline-date-text inline-date-part" aria-label={`${label} năm`} inputMode="numeric" maxLength={2} value={dateParts.year} onFocus={(event) => event.currentTarget.select()} onChange={(event) => updatePart("year", event.target.value)} onKeyDown={(event) => handlePartKeyDown(event, "year")} />
+    </div>
+    <button ref={calendarButtonRef} type="button" className="inline-date-button" title={`Chọn ${label.toLocaleLowerCase("vi")}`} aria-label={`Chọn ${label.toLocaleLowerCase("vi")}`} onMouseDown={(event) => event.preventDefault()} onClick={openDatePicker}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3.5h10v9H3zM5 2v3M11 2v3M3 6h10M5.5 8.5h2M9 8.5h1.5M5.5 11h2" /></svg></button>
     {calendarOpen && createPortal(<div ref={calendarRef} className="vi-calendar" style={{ left: calendarPosition.left, top: calendarPosition.top }} role="dialog" aria-label={`Lịch chọn ${label.toLocaleLowerCase("vi")}`}>
       <header><button type="button" aria-label="Tháng trước" onClick={() => setViewMonth(new Date(calendarYear, calendarMonth - 1, 1))}>‹</button><strong>Tháng {calendarMonth + 1} năm {calendarYear}</strong><button type="button" aria-label="Tháng sau" onClick={() => setViewMonth(new Date(calendarYear, calendarMonth + 1, 1))}>›</button></header>
       <div className="vi-calendar-weekdays">{["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map((weekday) => <span key={weekday}>{weekday}</span>)}</div>
@@ -500,19 +582,21 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
   const [autoEditItemId, setAutoEditItemId] = useState<string | null>(null);
   const [taskDetailMode, setTaskDetailMode] = useState<"docked" | "collapsed" | "hidden">("docked");
   const [ganttDayStep, setGanttDayStep] = useState(1);
-  const [taskNameColumnWidth, setTaskNameColumnWidth] = useState(415);
+  const [taskNameColumnWidth, setTaskNameColumnWidth] = useState(minimumTaskNameColumnWidth);
   const [columnGroupVisibility, setColumnGroupVisibility] = useState<TaskGridColumnGroupVisibility>({ basic: true, progress: true, estimate: false, resource: false });
   const [scheduleLoading, setScheduleLoading] = useState(true);
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [taskContextMenu, setTaskContextMenu] = useState<TaskContextMenuState | null>(null);
   const taskGridHeaderScrollRef = useRef<HTMLDivElement>(null);
   const taskGridBodyScrollRef = useRef<HTMLDivElement>(null);
+  const taskGridBottomScrollRef = useRef<HTMLDivElement>(null);
   const ganttHeaderScrollRef = useRef<HTMLDivElement>(null);
   const ganttScrollRef = useRef<HTMLDivElement>(null);
   const ganttBottomScrollRef = useRef<HTMLDivElement>(null);
   const ganttContentRef = useRef<HTMLDivElement>(null);
   const taskDetailNameInputRef = useRef<HTMLInputElement>(null);
   const visibleProjectIds = useMemo(() => new Set(projects.filter((project) => project.visible).map((project) => project.id)), [projects]);
+  const projectStatusById = useMemo(() => new Map(projects.map((project) => [project.id, project.status])), [projects]);
   const projectIdsKey = projects.map((project) => project.id).sort().join("|");
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const scheduleOrder = useMemo(() => calculateScheduleOrder(items), [items]);
@@ -615,7 +699,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     if (ganttBottomScrollRef.current) ganttBottomScrollRef.current.scrollLeft = 0;
   }, [timelineStartTime, visibleProjectKey]);
   const basicColumnWidths = [50, 116, taskNameColumnWidth];
-  const scheduleColumnWidths = [74, 70, 70, 50, 96];
+  const scheduleColumnWidths = [74, 92, 92, 50, 115];
   const estimateColumnWidths = [60, 86, 100];
   const resourceColumnWidths = [50, 50, 60, 60];
   const visibleColumnWidths = [
@@ -703,9 +787,15 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     setColumnGroupVisibility((current) => ({ ...current, [group]: !current[group] }));
   }
 
-  function syncTaskGridHorizontalScroll(scrollLeft: number, source: "header" | "body") {
-    const target = source === "header" ? taskGridBodyScrollRef.current : taskGridHeaderScrollRef.current;
-    if (target && Math.abs(target.scrollLeft - scrollLeft) > 1) target.scrollLeft = scrollLeft;
+  function syncTaskGridHorizontalScroll(scrollLeft: number, source: "header" | "body" | "dock") {
+    const targets = [
+      source === "header" ? null : taskGridHeaderScrollRef.current,
+      source === "body" ? null : taskGridBodyScrollRef.current,
+      source === "dock" ? null : taskGridBottomScrollRef.current,
+    ];
+    targets.forEach((target) => {
+      if (target && Math.abs(target.scrollLeft - scrollLeft) > 1) target.scrollLeft = scrollLeft;
+    });
   }
 
   const commitItems = useCallback((next: ScheduleItem[] | ((current: ScheduleItem[]) => ScheduleItem[]), options: { description: string; mergeKey?: string }) => {
@@ -1149,7 +1239,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
     function handlePointerMove(pointerEvent: globalThis.PointerEvent) {
-      setTaskNameColumnWidth(Math.max(minimumTaskNameColumnWidth, Math.min(915, startWidth + pointerEvent.clientX - startX)));
+      setTaskNameColumnWidth(Math.max(minimumTaskNameColumnWidth, Math.min(maximumTaskNameColumnWidth, startWidth + pointerEvent.clientX - startX)));
     }
     function finishResize() {
       document.body.style.cursor = previousCursor;
@@ -1185,8 +1275,12 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
   }
 
   function updateScheduleDate(target: ScheduleItem, field: "startDate" | "finishDate", value: string) {
+    const oldDuration = Math.max(1, target.duration);
     const startDate = field === "startDate" ? value : target.startDate;
-    const finishDate = field === "finishDate" ? value : target.finishDate;
+    let finishDate = field === "finishDate" ? value : target.finishDate;
+    if (field === "startDate" && calculateDuration(startDate, finishDate) == null) {
+      finishDate = calculateFinishDate(startDate, oldDuration) ?? finishDate;
+    }
     const duration = calculateDuration(startDate, finishDate);
     if (!duration) {
       onNotice("Ngày kết thúc phải bằng hoặc sau ngày bắt đầu");
@@ -1197,7 +1291,11 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     const changes: Partial<ScheduleItem> = { startDate, finishDate, duration, ganttWidth };
     scheduleHistory.commit((current) => {
       const changedItems = current.items.map((item) => item.id === target.id ? { ...item, ...changes } : item);
-      return { ...current, items: propagateDependencySchedule(changedItems, current.dependencies, [target.id]) };
+      const recalibratedDependencies = recalibrateIncomingDependencyLags(changedItems, current.dependencies, target.id, {
+        start: field === "startDate",
+        finish: field === "finishDate" || finishDate !== target.finishDate,
+      });
+      return { dependencies: recalibratedDependencies, items: propagateDependencySchedule(changedItems, recalibratedDependencies, [target.id]) };
     }, { description: `Đổi ${field === "startDate" ? "ngày bắt đầu" : "ngày kết thúc"} ${target.wbs}`, mergeKey: `date-${field}-${target.id}` });
     onNotice(`Đã cập nhật ngày, thời lượng và Gantt của ${target.name}`);
     return true;
@@ -1420,13 +1518,15 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       </div>
 
       <div className="schedule-board-body">
-      <div ref={taskGridBodyScrollRef} className="schedule-table-pane" onScroll={(event) => { syncTaskGridHorizontalScroll(event.currentTarget.scrollLeft, "body"); setTaskContextMenu(null); }}>
+      <div className="schedule-board-scroll" onScroll={() => setTaskContextMenu(null)}>
+      <div ref={taskGridBodyScrollRef} className="schedule-table-pane" onScroll={(event) => syncTaskGridHorizontalScroll(event.currentTarget.scrollLeft, "body")}>
         <div ref={wbsInsertionLineRef} className="wbs-insertion-line" aria-hidden="true" />
         <div className="schedule-rows">
           {visibleItems.map((item) => {
             const isSelected = item.id === selectedItem?.id;
             const expandable = hasChildren(item.id);
             const derivedDates = item.type === "task" ? null : summaryDates.get(item.id);
+            const displayStatus = item.type === "project" ? getProjectScheduleStatus(projectStatusById.get(item.projectId)) : "NOT_STARTED";
             const itemDependencies = incomingDependencies.get(item.id) ?? [];
             const predecessorText = itemDependencies.length ? itemDependencies.map((dependency) => formatDependencyLabel(dependency, scheduleOrder)).join(";") : "—";
             const predecessorTooltip = itemDependencies.map((dependency) => {
@@ -1441,15 +1541,21 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
                   ? <button className="action-slot-add" aria-label="Thêm hạng mục" title="Thêm hạng mục" onClick={() => addChildItem(item)}>+</button>
                   : <>{(item.type === "workItem" || item.type === "group") && <button className="action-slot-add" aria-label="Thêm công tác" title="Thêm công tác" onClick={() => addChildItem(item)}>+</button>}<button className="action-slot-insert-above" aria-label="Chèn lên trên" title="Chèn lên trên" onClick={() => insertScheduleItem(item, "before")}><span className="action-triangle">▲</span></button><button className="action-slot-insert-below" aria-label="Chèn xuống dưới" title="Chèn xuống dưới" onClick={() => insertScheduleItem(item, "after")}><span className="action-triangle">▼</span></button><button className="action-slot-delete" aria-label="Xóa" title="Xóa" onClick={() => deleteItem(item)}><svg className="action-trash-icon" aria-hidden="true" viewBox="0 0 16 16"><path d="M5 5v7m3-7v7m3-7v7M3.5 3.5h9l-.6 10h-7.8l-.6-10ZM6 3.5V2h4v1.5M2.5 3.5h11" /></svg></button></>}
               </div>
-              <div className="task-name" style={{ paddingLeft: `${10 + getScheduleTreeDepth(item, itemById) * 18}px` }}>
+              <div className={`task-name ${autoEditItemId === item.id ? "is-editing" : ""}`} style={{ paddingLeft: `${10 + getScheduleTreeDepth(item, itemById) * 18}px` }} onDoubleClick={(event) => {
+                const target = event.target as HTMLElement;
+                if (target.closest("button, input")) return;
+                event.stopPropagation();
+                setSelectedItemId(item.id);
+                setAutoEditItemId(item.id);
+              }}>
                 {expandable ? <button className="tree-toggle" onClick={(event) => { event.stopPropagation(); toggleCollapse(item.id); }}>{collapsedIds.has(item.id) ? "›" : "⌄"}</button> : <span className="tree-spacer" />}
-                <InlineNameEditor value={item.name} autoEdit={autoEditItemId === item.id} onCommit={(name) => { setAutoEditItemId(null); setSelectedItemId(item.id); commitItems((current) => current.map((currentItem) => currentItem.id === item.id ? { ...currentItem, name } : currentItem), { description: `Đổi tên ${item.wbs} thành “${name}”` }); onNotice(`Đã đổi tên ${item.wbs}`); }} />{item.nature && <small>{item.nature}</small>}
+                <InlineNameEditor key={`${item.id}-${autoEditItemId === item.id ? "editing" : "display"}`} value={item.name} autoEdit={autoEditItemId === item.id} onFinishEditing={() => setAutoEditItemId((currentId) => currentId === item.id ? null : currentId)} onCommit={(name) => { setSelectedItemId(item.id); commitItems((current) => current.map((currentItem) => currentItem.id === item.id ? { ...currentItem, name } : currentItem), { description: `Đổi tên ${item.wbs} thành “${name}”` }); onNotice(`Đã đổi tên ${item.wbs}`); }} />{item.nature && autoEditItemId !== item.id && <small>{item.nature}</small>}
               </div>
-              {columnGroupVisibility.progress && <>{item.type === "task" ? <><div className="duration-cell"><input aria-label={`Thời lượng ${item.name}`} type="number" min="1" value={item.duration} onFocus={() => setSelectedItemId(item.id)} onChange={(event) => updateDuration(item, Number(event.target.value))} onKeyDown={(event) => { event.stopPropagation(); if (event.key === "Enter") event.currentTarget.blur(); }} /><span>n</span></div>
+              {columnGroupVisibility.progress && <>{item.type === "task" ? <><div className="duration-cell"><input aria-label={`Thời lượng ${item.name}`} type="number" min="1" value={item.duration} onFocus={(event) => { setSelectedItemId(item.id); event.currentTarget.select(); }} onChange={(event) => updateDuration(item, Number(event.target.value))} onKeyDown={(event) => { event.stopPropagation(); if (event.key === "Enter") event.currentTarget.blur(); }} /><span>n</span></div>
               <div className="date-cell"><InlineDateEditor key={`${item.id}-start-${item.startDate}`} label={`Ngày bắt đầu ${item.name}`} value={item.startDate} onCommit={(value) => { setSelectedItemId(item.id); return updateScheduleDate(item, "startDate", value); }} onInvalid={() => onNotice("Ngày bắt đầu phải đúng định dạng dd/MM/yy")} /></div>
               <div className="date-cell"><InlineDateEditor key={`${item.id}-finish-${item.finishDate}`} label={`Ngày kết thúc ${item.name}`} value={item.finishDate} onCommit={(value) => { setSelectedItemId(item.id); return updateScheduleDate(item, "finishDate", value); }} onInvalid={() => onNotice("Ngày kết thúc phải đúng định dạng dd/MM/yy")} /></div></> : <><div className="duration-cell summary-value"><span>{derivedDates?.duration ?? "—"} {derivedDates ? "ngày" : ""}</span></div><div className="date-cell summary-value"><span>{derivedDates?.startDate ?? "—"}</span></div><div className="date-cell summary-value"><span>{derivedDates?.finishDate ?? "—"}</span></div></>}
               <div className={`predecessor-cell ${item.type === "task" ? "editable" : ""}`} title={predecessorTooltip || "Không có công tác trước"} onDoubleClick={() => openDependencyEditor(item)}><span>{item.type === "task" ? predecessorText : "—"}</span></div>
-              <div className="plain-data-cell">—</div></>}
+              <div className="schedule-status-cell"><ScheduleStatusChip status={displayStatus} /></div></>}
               {columnGroupVisibility.estimate && <><div className="plain-data-cell">{item.type === "task" ? item.unit ?? "—" : "—"}</div><div className="numeric-data-cell">{item.type === "task" ? formatOptionalNumber(item.quantity) : "—"}</div><div className="numeric-data-cell">{item.type === "task" && item.quantity != null && item.duration > 0 ? formatOptionalNumber(item.quantity / item.duration) : "—"}</div></>}
               {columnGroupVisibility.resource && <><div className="numeric-data-cell">{item.type === "task" ? formatOptionalNumber(item.machineShiftCoefficient) : "—"}</div><div className="numeric-data-cell">{item.type === "task" ? formatOptionalNumber(item.machineCount) : "—"}</div><div className="numeric-data-cell">{item.type === "task" ? formatOptionalNumber(item.managedLabor) : "—"}</div><div className="numeric-data-cell">{item.type === "task" ? formatOptionalNumber(item.permanentLabor) : "—"}</div></>}
             </div>;
@@ -1504,8 +1610,9 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
           </div> : <div className="gantt-empty">Chọn dự án để tạo lịch Gantt.</div>}
         </div>
       </div>
+      </div>
     <div className="gantt-scrollbar-row" aria-hidden="true">
-      <div className="gantt-scrollbar-spacer" />
+      <div ref={taskGridBottomScrollRef} className="task-grid-scrollbar-dock" onScroll={(event) => syncTaskGridHorizontalScroll(event.currentTarget.scrollLeft, "dock")}><div className="task-grid-scrollbar-content" style={{ width: scheduleTableWidth }} /></div>
       <div ref={ganttBottomScrollRef} className="gantt-scrollbar-dock" onScroll={(event) => {
         const timelineScroll = ganttScrollRef.current;
         if (timelineScroll && Math.abs(timelineScroll.scrollLeft - event.currentTarget.scrollLeft) > 1) timelineScroll.scrollLeft = event.currentTarget.scrollLeft;
