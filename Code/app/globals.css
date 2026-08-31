@@ -1038,7 +1038,14 @@ button {
   min-height: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: none
+  scrollbar-width: none;
+  outline: none
+}
+
+.schedule-table-pane:focus,
+.schedule-table-pane:focus-visible {
+  outline: none;
+  box-shadow: none
 }
 
 .schedule-table-pane::-webkit-scrollbar {
@@ -1417,7 +1424,7 @@ button {
   min-height: 32px;
   height: 32px;
   max-height: 32px;
-  overflow: hidden;
+  overflow: visible;
   border-bottom: 1px solid var(--line);
   background: var(--task-row-background);
   cursor: pointer
@@ -1442,6 +1449,72 @@ button {
 .schedule-row:hover,
 .schedule-row.selected {
   box-shadow: inset 3px 0 0 var(--primary)
+}
+
+.schedule-row > div.task-grid-cell-selected {
+  position: relative;
+  z-index: 1;
+  background: rgba(33, 115, 70, .07);
+  box-shadow: inset 0 0 0 .5px rgba(33, 115, 70, .32)
+}
+
+@keyframes task-grid-copy-marching {
+  0%, 100% { outline-offset: 0; opacity: 1 }
+  50% { outline-offset: 1px; opacity: .72 }
+}
+
+.schedule-row > div.task-grid-cell-copying.task-grid-cell-selection-top { border-top: 1px dashed #217346; animation: task-grid-copy-marching .9s linear infinite }
+.schedule-row > div.task-grid-cell-copying.task-grid-cell-selection-bottom { border-bottom: 1px dashed #217346; animation: task-grid-copy-marching .9s linear infinite }
+.schedule-row > div.task-grid-cell-copying.task-grid-cell-selection-left { border-left: 1px dashed #217346; animation: task-grid-copy-marching .9s linear infinite }
+.schedule-row > div.task-grid-cell-copying.task-grid-cell-selection-right { border-right: 1px dashed #217346; animation: task-grid-copy-marching .9s linear infinite }
+
+.schedule-row > div.task-grid-cell-copying.task-grid-cell-selection-bottom::before { background: transparent }
+
+.schedule-row > div.task-grid-cell-selection-top { border-top: 1px solid #217346 }
+.schedule-row > div.task-grid-cell-selection-bottom {
+  border-bottom-color: transparent;
+  box-shadow: inset 0 -1px 0 #217346
+}
+.schedule-row > div.task-grid-cell-selection-left { border-left: 1px solid #217346 }
+.schedule-row > div.task-grid-cell-selection-right { border-right: 1px solid #217346 }
+
+.schedule-row > div.task-grid-cell-selection-right.task-grid-cell-selection-bottom::after {
+  content: "";
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+  border: 1px solid #fff;
+  background: #217346;
+  cursor: crosshair;
+  z-index: 3
+}
+
+.schedule-row > div.task-grid-cell-selection-right.task-grid-cell-selection-bottom {
+  overflow: visible;
+  border-bottom-color: transparent;
+  box-shadow: inset 0 -1px 0 #217346
+}
+
+.schedule-row > div.task-grid-cell-selected.task-grid-cell-selection-bottom::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  left: -1px;
+  right: -1px;
+  bottom: 0;
+  height: 1px;
+  background: #217346;
+  pointer-events: none
+}
+
+.schedule-row > div.task-grid-cell-copying.task-grid-cell-selection-bottom {
+  box-shadow: inset 0 0 0 .5px rgba(33, 115, 70, .32)
+}
+
+.schedule-row > div.task-grid-cell-copying.task-grid-cell-selection-bottom::before {
+  background: transparent
 }
 
 .schedule-row>div {
@@ -1721,6 +1794,21 @@ button {
   height: 24px
 }
 
+.inline-date-display-mode {
+  display: flex;
+  align-items: center;
+  padding: 0 3px;
+  cursor: default
+}
+
+.inline-date-display {
+  display: block;
+  width: 100%;
+  line-height: 22px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap
+}
+
 .inline-date-mask {
   width: 100%;
   height: 24px;
@@ -1928,6 +2016,24 @@ button {
   border-radius: 4px;
   background: transparent;
   color: #52646e
+}
+
+.tree-toggle {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border-radius: 3px
+}
+
+.tree-toggle svg {
+  width: 10px;
+  height: 10px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.45;
+  stroke-linecap: round;
+  stroke-linejoin: round
 }
 
 .row-actions button:hover:not(:disabled),

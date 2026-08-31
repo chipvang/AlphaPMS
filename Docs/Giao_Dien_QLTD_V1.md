@@ -2,7 +2,7 @@
 
 - **Trạng thái:** Đã chốt giao diện V1.
 - **Ngày chốt:** 20/08/2026.
-- **Phạm vi hoàn thành:** Bố cục, thao tác cây tiến độ, inline edit, Undo/Redo, lịch và thanh Gantt, quan hệ công việc FS/SS, vùng cuộn kiểu Excel, chú giải và các chế độ hiển thị `TaskDetail`.
+- **Phạm vi hoàn thành:** Bố cục, thao tác cây tiến độ, inline edit, Undo/Redo, lịch và thanh Gantt, quan hệ công việc FS/SS, vùng cuộn kiểu Excel, chọn vùng/copy-paste dữ liệu, chú giải và các chế độ hiển thị `TaskDetail`.
 
 ## 1. Mục đích
 
@@ -341,7 +341,7 @@ Việc đổi cấp lịch không đặt thành một nút riêng trên thanh c�
 
 Phạm vi và mật độ lịch:
 
-- Xác định ngày bắt đầu nhỏ nhất trong các dự án đang được chọn hiển thị, sau đó lùi thêm đúng ba cột để tạo khoảng hở trước thanh Gantt: `timeline_start = minimum_project_start_date - 3 × day_step`.
+- Xác định ngày bắt đầu nhỏ nhất trong các dự án đang được chọn hiển thị, sau đó lùi thêm đúng bảy cột để tạo khoảng hở trước thanh Gantt: `timeline_start = minimum_project_start_date - 7 × day_step`.
 - Ngày cuối cùng của lịch bằng ngày kết thúc lớn nhất của toàn bộ công tác thuộc các dự án đang chọn cộng `7 × day_step`, kể cả công tác đang bị ẩn do thu gọn cây hoặc Outline. Nếu dự án chưa có công tác, dùng ngày kết thúc dự án làm giá trị dự phòng rồi vẫn cộng khoảng đệm. Mục tiêu là luôn có đúng bảy cột trống sau công tác cuối.
 - Sau nút **Lọc** có ô spin **Cách nhau: n ngày**, giá trị nguyên tối thiểu 1. Mỗi cột lịch đại diện lần lượt 1, 2, 3... `n` ngày.
 - Giá trị mặc định là 1 ngày/cột; giới hạn giao diện V1 là 365 ngày/cột.
@@ -594,6 +594,18 @@ Nguồn mô phỏng giao diện đã chốt:
 - Icon mono màu trung tính, kích thước thị giác khoảng `10–12px`; không border, không shadow và nền mặc định trong suốt.
 - `▲` là **Chèn lên trên**, `▼` là **Chèn xuống dưới** và icon thùng rác là **Xóa**. Hai action **Đẩy vào/Đẩy ra** đã được loại bỏ; reorder/reparent dùng drag từ ô STT.
 - Dòng Dự án chỉ hiển thị `+` để thêm Hạng mục. Hạng mục/Nhóm hiển thị `+`, Chèn trên, Chèn dưới và Xóa. Công tác không có `+` và không dùng placeholder cho action bị thiếu.
+
+## Chọn vùng và copy/paste trong TaskGrid
+
+- TaskGrid có một trạng thái chọn vùng duy nhất, gồm `anchorRow`, `anchorColumn`, `focusRow`, `focusColumn`; không hỗ trợ chọn nhiều vùng rời nhau trong V1.
+- Kéo từ một ô đến ô khác tạo khung chọn trực quan theo kiểu Excel. Vùng chọn dùng một đường viền ngoài màu xanh Excel; các đường lưới bên trong không bị đổi kiểu. Góc phải dưới có tay nắm 8px để mở rộng vùng.
+- Nhấn `Ctrl+C` khi vùng đang chọn sẽ tạo clipboard có cấu trúc bảng: `text/plain` dùng ký tự tab giữa các cột và xuống dòng giữa các hàng; đồng thời tạo `text/html` dạng `<table>` để Excel nhận đúng số hàng/cột. Cột **Tác vụ** không bao giờ được copy.
+- Các cột copy hiện tại gồm: **Tên công việc**, **Thời lượng**, **Bắt đầu**, **Kết thúc** và **Tình trạng** (khi nhóm Tiến độ đang bật). Dữ liệu summary được lấy từ giá trị dẫn xuất đang hiển thị.
+- Cơ chế copy dựa trên định nghĩa cột, không ghép chuỗi theo toàn bộ DOM. Mỗi cột khai báo getter dữ liệu và chỉ được đưa vào clipboard khi thuộc vùng chọn.
+- Khi mở rộng sang nhóm **Dự toán** hoặc **Nguồn lực**, mỗi định nghĩa cột phải có thuộc tính kỹ thuật `copyable: boolean`. Chỉ cột có `copyable: true` mới được đưa vào clipboard; cột hiển thị nhưng `copyable: false` vẫn giữ trong lưới và bị bỏ qua khi copy/paste.
+- Paste từ Excel đọc ma trận theo tab/xuống dòng, ánh xạ tuần tự vào các cột đích có `copyable: true`; giá trị sai định dạng bị bỏ qua, không ghi dữ liệu rác vào lưới. Mọi thay đổi hợp lệ là một bước Undo/Redo.
+- Nhấn `Ctrl` trong lúc kéo tay nắm để chuyển sang copy-fill trong lưới; kéo tay nắm thông thường chỉ mở rộng vùng chọn. `Esc` hoặc click ra ngoài TaskGrid thoát trạng thái chọn/copy nhưng vẫn giữ focus bàn phím cho lưới.
+- Ô ngày chỉ chuyển sang chế độ sửa/lịch khi double-click; click một lần luôn dành cho chọn ô và thao tác copy/paste.
 
 ## Kéo thả sắp xếp cây WBS
 

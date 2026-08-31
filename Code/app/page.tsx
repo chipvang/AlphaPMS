@@ -219,6 +219,7 @@ type WbsDragState = {
 
 type WbsSlotGeometry = TreeInsertionSlot & { x: number; y: number };
 type TaskContextMenuState = { taskId: string; x: number; y: number };
+type TaskGridSelection = { anchorRow: number; anchorColumn: number; focusRow: number; focusColumn: number };
 
 const initialScheduleState: ScheduleState = { items: [], dependencies: [] };
 
@@ -318,6 +319,13 @@ function parseDisplayDate(value: string) {
   return date;
 }
 
+function normalizePastedDate(value: string) {
+  const match = /^(\d{2})\/(\d{2})\/(\d{2}|\d{4})$/.exec(value.trim());
+  if (!match) return null;
+  const normalized = `${match[1]}/${match[2]}/${match[3].slice(-2)}`;
+  return parseDisplayDate(normalized) ? normalized : null;
+}
+
 function formatDisplayDate(date: Date) {
   return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getFullYear() % 100).padStart(2, "0")}`;
 }
@@ -413,6 +421,7 @@ function InlineDateEditor({ label, value, onCommit, onInvalid }: { label: string
     return match ? { day: match[1], month: match[2], year: match[3] } : { day: "", month: "", year: String(new Date().getFullYear() % 100).padStart(2, "0") };
   };
   const [dateParts, setDateParts] = useState(() => getDateParts(value));
+  const [isEditing, setIsEditing] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarPosition, setCalendarPosition] = useState({ left: 0, top: 0 });
   const [viewMonth, setViewMonth] = useState(() => parseDisplayDate(value) ?? new Date());
@@ -421,6 +430,13 @@ function InlineDateEditor({ label, value, onCommit, onInvalid }: { label: string
   const yearInputRef = useRef<HTMLInputElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
   const calendarButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (isEditing) {
+      dayInputRef.current?.focus();
+      dayInputRef.current?.select();
+    }
+  }, [isEditing]);
 
   useEffect(() => {
     if (!calendarOpen) return;
@@ -445,16 +461,21 @@ function InlineDateEditor({ label, value, onCommit, onInvalid }: { label: string
 
   function commitDraft() {
     const draftValue = draftDateValue();
-    if (draftValue === value) return;
+    if (draftValue === value) {
+      setIsEditing(false);
+      return;
+    }
     const date = parseDisplayDate(draftValue);
     if (!date) {
       setDateParts(getDateParts(value));
       onInvalid();
+      setIsEditing(false);
       return;
     }
     const formattedValue = formatDisplayDate(date);
     setDateParts(getDateParts(formattedValue));
     if (onCommit(formattedValue) === false) setDateParts(getDateParts(value));
+    setIsEditing(false);
   }
 
   function focusPart(part: "day" | "month" | "year") {
@@ -481,6 +502,8 @@ function InlineDateEditor({ label, value, onCommit, onInvalid }: { label: string
     }
     if (event.key === "Escape") {
       setDateParts(getDateParts(value));
+      setIsEditing(false);
+      setCalendarOpen(false);
       input.blur();
       return;
     }
@@ -521,6 +544,7 @@ function InlineDateEditor({ label, value, onCommit, onInvalid }: { label: string
     if (onCommit(nextValue) !== false) setDateParts(getDateParts(nextValue));
     else setDateParts(getDateParts(value));
     setCalendarOpen(false);
+    setIsEditing(false);
   }
 
   const calendarYear = viewMonth.getFullYear();
@@ -534,6 +558,16 @@ function InlineDateEditor({ label, value, onCommit, onInvalid }: { label: string
     date.setDate(calendarStart.getDate() + index);
     return date;
   });
+
+  if (!isEditing) {
+    return <div className="inline-date-editor inline-date-display-mode" onDoubleClick={(event) => {
+      event.stopPropagation();
+      setDateParts(getDateParts(value));
+      setIsEditing(true);
+    }} title="Bấm kép để sửa ngày">
+      <span className="inline-date-display" aria-label={label}>{value}</span>
+    </div>;
+  }
 
   return <div className="inline-date-editor" onBlur={(event) => { if (!calendarOpen && !event.currentTarget.contains(event.relatedTarget as Node)) commitDraft(); }}>
     <div className="inline-date-mask" aria-label={label}>
@@ -587,6 +621,14 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
   const [scheduleLoading, setScheduleLoading] = useState(true);
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [taskContextMenu, setTaskContextMenu] = useState<TaskContextMenuState | null>(null);
+  const [taskGridSelection, setTaskGridSelection] = useState<TaskGridSelection | null>(null);
+  const [taskGridCopyActive, setTaskGridCopyActive] = useState(false);
+  const taskGridSelectingRef = useRef(false);
+  const taskGridSelectionRef = useRef<TaskGridSelection | null>(null);
+  const taskGridFillSourceRef = useRef<TaskGridSelection | null>(null);
+  const taskGridFillModeRef = useRef(false);
+  const taskGridHandleDragRef = useRef(false);
+  const taskGridCtrlRef = useRef(false);
   const taskGridHeaderScrollRef = useRef<HTMLDivElement>(null);
   const taskGridBodyScrollRef = useRef<HTMLDivElement>(null);
   const taskGridBottomScrollRef = useRef<HTMLDivElement>(null);
@@ -630,15 +672,15 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
     return true;
   }), [collapsedIds, itemById, items, outlineLevel, visibleProjectIds]);
   const timeline = useMemo(() => {
-    const scheduleProjectStartDates = items
-      .filter((item) => visibleProjectIds.has(item.projectId) && item.type === "project")
+    const taskStartDates = items
+      .filter((item) => visibleProjectIds.has(item.projectId) && item.type === "task")
       .map((item) => parseDisplayDate(item.startDate))
       .filter((date): date is Date => Boolean(date));
     const fallbackProjectStartDates = projects
       .filter((project) => visibleProjectIds.has(project.id))
       .map((project) => parseIsoDate(project.startDate))
       .filter((date): date is Date => Boolean(date));
-    const projectStartDates = scheduleProjectStartDates.length ? scheduleProjectStartDates : fallbackProjectStartDates;
+    const projectStartDates = taskStartDates.length ? taskStartDates : fallbackProjectStartDates;
     const taskFinishDates = items
       .filter((item) => visibleProjectIds.has(item.projectId) && item.type === "task")
       .map((item) => parseDisplayDate(item.finishDate))
@@ -649,7 +691,7 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       .filter((date): date is Date => Boolean(date));
     if (!projectStartDates.length) return null;
     const minimumProjectStartDate = new Date(Math.min(...projectStartDates.map((date) => date.getTime())));
-    const startDate = addCalendarDays(minimumProjectStartDate, -3 * ganttDayStep);
+    const startDate = addCalendarDays(minimumProjectStartDate, -7 * ganttDayStep);
     const finishCandidates = taskFinishDates.length ? taskFinishDates : fallbackFinishDates;
     const finishDate = finishCandidates.length
       ? new Date(Math.max(...finishCandidates.map((date) => date.getTime())))
@@ -804,6 +846,222 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
       items: typeof next === "function" ? next(current.items) : next,
     }), options);
   }, [scheduleHistory]);
+
+  function getTaskGridCellFromPoint(clientX: number, clientY: number) {
+    const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+    const cell = target?.closest<HTMLElement>(".schedule-row > div");
+    const row = cell?.parentElement;
+    if (!cell || !row || cell.classList.contains("wbs-cell") || target?.closest("button, input, select, textarea")) return null;
+    const rowIndex = Array.from(row.parentElement?.children ?? []).indexOf(row);
+    const columnIndex = Array.from(row.children).indexOf(cell);
+    return rowIndex >= 0 && columnIndex >= 0 ? { rowIndex, columnIndex } : null;
+  }
+
+  function startTaskGridSelection(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    const cell = getTaskGridCellFromPoint(event.clientX, event.clientY);
+    if (!cell) return;
+    event.preventDefault();
+    event.currentTarget.focus();
+    const selected = taskGridSelection;
+    const selectedRow = selected ? Math.max(selected.anchorRow, selected.focusRow) : -1;
+    const selectedColumn = selected ? Math.max(selected.anchorColumn, selected.focusColumn) : -1;
+    const targetElement = event.target as HTMLElement;
+    const targetRect = targetElement.closest<HTMLElement>(".schedule-row > div")?.getBoundingClientRect();
+    if (selected && cell.rowIndex === selectedRow && cell.columnIndex === selectedColumn && targetRect && event.clientX >= targetRect.right - 8 && event.clientY >= targetRect.bottom - 8) {
+      taskGridFillModeRef.current = event.ctrlKey;
+      taskGridFillSourceRef.current = selected;
+      taskGridHandleDragRef.current = true;
+      taskGridSelectingRef.current = true;
+      return;
+    }
+    taskGridSelectingRef.current = true;
+    setTaskGridCopyActive(false);
+    taskGridHandleDragRef.current = false;
+    taskGridFillModeRef.current = false;
+    taskGridFillSourceRef.current = null;
+    taskGridSelectionRef.current = { anchorRow: cell.rowIndex, anchorColumn: cell.columnIndex, focusRow: cell.rowIndex, focusColumn: cell.columnIndex };
+    setTaskGridSelection({ anchorRow: cell.rowIndex, anchorColumn: cell.columnIndex, focusRow: cell.rowIndex, focusColumn: cell.columnIndex });
+  }
+
+  useEffect(() => {
+    function updateTaskGridSelection(event: globalThis.PointerEvent) {
+      if (!taskGridSelectingRef.current) return;
+      if (taskGridHandleDragRef.current && (event.ctrlKey || taskGridCtrlRef.current)) taskGridFillModeRef.current = true;
+      const cell = getTaskGridCellFromPoint(event.clientX, event.clientY);
+      if (cell) setTaskGridSelection((current) => {
+        if (!current) return current;
+        const next = { ...current, focusRow: cell.rowIndex, focusColumn: cell.columnIndex };
+        taskGridSelectionRef.current = next;
+        return next;
+      });
+    }
+    function finishTaskGridSelection(event: globalThis.PointerEvent) {
+      if (event.ctrlKey || taskGridCtrlRef.current) taskGridFillModeRef.current = true;
+      if (taskGridSelectingRef.current && taskGridFillModeRef.current && taskGridFillSourceRef.current && taskGridSelectionRef.current) {
+        const source = taskGridFillSourceRef.current;
+        const target = taskGridSelectionRef.current;
+        const sourceRowStart = Math.min(source.anchorRow, source.focusRow);
+        const sourceRowEnd = Math.max(source.anchorRow, source.focusRow);
+        const sourceColumnStart = Math.min(source.anchorColumn, source.focusColumn);
+        const sourceColumnEnd = Math.max(source.anchorColumn, source.focusColumn);
+        const targetRowStart = Math.min(target.anchorRow, target.focusRow);
+        const targetRowEnd = Math.max(target.anchorRow, target.focusRow);
+        const targetColumnStart = Math.min(target.anchorColumn, target.focusColumn);
+        const targetColumnEnd = Math.max(target.anchorColumn, target.focusColumn);
+        const allowedColumns = new Set([2, 3, 4, 5]);
+        const nextItems = items.map((item, rowIndex) => {
+          if (item.type !== "task" || rowIndex < targetRowStart || rowIndex > targetRowEnd) return item;
+          const sourceRow = sourceRowStart + ((rowIndex - sourceRowStart) % Math.max(1, sourceRowEnd - sourceRowStart + 1));
+          const sourceItem = items[sourceRow];
+          if (!sourceItem || sourceItem.type !== "task") return item;
+          const changes: Partial<ScheduleItem> = {};
+          for (let column = targetColumnStart; column <= targetColumnEnd; column += 1) {
+            if (!allowedColumns.has(column)) continue;
+            const sourceColumn = sourceColumnStart + ((column - sourceColumnStart) % Math.max(1, sourceColumnEnd - sourceColumnStart + 1));
+            const value = sourceColumn === 2 ? sourceItem.name : sourceColumn === 3 ? String(sourceItem.duration) : sourceColumn === 4 ? sourceItem.startDate : sourceItem.finishDate;
+            if (column === 2) changes.name = value;
+            if (column === 3 && /^\d+$/.test(value)) changes.duration = Math.max(1, Number(value));
+            if (column === 4) changes.startDate = normalizePastedDate(value) ?? item.startDate;
+            if (column === 5) changes.finishDate = normalizePastedDate(value) ?? item.finishDate;
+          }
+          return { ...item, ...changes };
+        });
+        if (nextItems.some((item, index) => item !== items[index])) commitItems(nextItems, { description: "Sao chép vùng dữ liệu trong TaskGrid", mergeKey: "fill-task-grid" });
+      }
+      taskGridSelectingRef.current = false;
+      taskGridFillModeRef.current = false;
+      taskGridFillSourceRef.current = null;
+      taskGridHandleDragRef.current = false;
+    }
+    document.addEventListener("pointermove", updateTaskGridSelection);
+    document.addEventListener("pointerup", finishTaskGridSelection);
+    document.addEventListener("pointercancel", finishTaskGridSelection);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Control") taskGridCtrlRef.current = true;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        taskGridSelectingRef.current = false;
+        taskGridFillModeRef.current = false;
+        taskGridFillSourceRef.current = null;
+        taskGridHandleDragRef.current = false;
+        taskGridSelectionRef.current = null;
+        setTaskGridSelection(null);
+        setTaskGridCopyActive(false);
+        taskGridBodyScrollRef.current?.focus();
+      }
+    };
+    const onKeyUp = (event: KeyboardEvent) => { if (event.key === "Control") taskGridCtrlRef.current = false; };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keyup", onKeyUp);
+    return () => {
+      document.removeEventListener("pointermove", updateTaskGridSelection);
+      document.removeEventListener("pointerup", finishTaskGridSelection);
+      document.removeEventListener("pointercancel", finishTaskGridSelection);
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("keyup", onKeyUp);
+    };
+  }, [commitItems, items]);
+
+  useEffect(() => { taskGridSelectionRef.current = taskGridSelection; }, [taskGridSelection]);
+
+  useEffect(() => {
+    function clearTaskGridSelection(event: globalThis.PointerEvent) {
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest(".schedule-table-pane")) {
+        taskGridSelectionRef.current = null;
+        setTaskGridSelection(null);
+        setTaskGridCopyActive(false);
+      }
+    }
+    document.addEventListener("pointerdown", clearTaskGridSelection);
+    return () => document.removeEventListener("pointerdown", clearTaskGridSelection);
+  }, []);
+
+  useEffect(() => {
+    const rowStart = taskGridSelection ? Math.min(taskGridSelection.anchorRow, taskGridSelection.focusRow) : -1;
+    const rowEnd = taskGridSelection ? Math.max(taskGridSelection.anchorRow, taskGridSelection.focusRow) : -1;
+    const columnStart = taskGridSelection ? Math.min(taskGridSelection.anchorColumn, taskGridSelection.focusColumn) : -1;
+    const columnEnd = taskGridSelection ? Math.max(taskGridSelection.anchorColumn, taskGridSelection.focusColumn) : -1;
+    document.querySelectorAll<HTMLElement>(".schedule-row").forEach((row, rowIndex) => {
+      Array.from(row.children).forEach((cell, columnIndex) => {
+        const selected = rowIndex >= rowStart && rowIndex <= rowEnd && columnIndex >= columnStart && columnIndex <= columnEnd;
+        cell.classList.toggle("task-grid-cell-selected", selected);
+        cell.classList.toggle("task-grid-cell-selection-top", selected && rowIndex === rowStart);
+        cell.classList.toggle("task-grid-cell-selection-bottom", selected && rowIndex === rowEnd);
+        cell.classList.toggle("task-grid-cell-selection-left", selected && columnIndex === columnStart);
+        cell.classList.toggle("task-grid-cell-selection-right", selected && columnIndex === columnEnd);
+        cell.classList.toggle("task-grid-cell-copying", selected && taskGridCopyActive);
+      });
+    });
+  }, [taskGridCopyActive, taskGridSelection, visibleItems.length, columnGroupVisibility]);
+
+  useEffect(() => {
+    function copyTaskGridSelection(event: ClipboardEvent) {
+      if (!taskGridSelection) return;
+      const rowStart = Math.min(taskGridSelection.anchorRow, taskGridSelection.focusRow);
+      const rowEnd = Math.max(taskGridSelection.anchorRow, taskGridSelection.focusRow);
+      const columnStart = Math.min(taskGridSelection.anchorColumn, taskGridSelection.focusColumn);
+      const columnEnd = Math.max(taskGridSelection.anchorColumn, taskGridSelection.focusColumn);
+      const copyColumns = [
+        { physicalIndex: 2, getValue: (item: ScheduleItem) => item.name },
+        ...(columnGroupVisibility.progress ? [
+          { physicalIndex: 3, getValue: (item: ScheduleItem) => item.type === "task" ? String(item.duration) : String(summaryDates.get(item.id)?.duration ?? "") },
+          { physicalIndex: 4, getValue: (item: ScheduleItem) => item.type === "task" ? item.startDate : summaryDates.get(item.id)?.startDate ?? "" },
+          { physicalIndex: 5, getValue: (item: ScheduleItem) => item.type === "task" ? item.finishDate : summaryDates.get(item.id)?.finishDate ?? "" },
+          { physicalIndex: 7, getValue: (item: ScheduleItem) => scheduleStatusPresentation[(item.type === "project" ? getProjectScheduleStatus(projectStatusById.get(item.projectId)) : "NOT_STARTED")].label },
+        ] : []),
+      ].filter((column) => column.physicalIndex >= columnStart && column.physicalIndex <= columnEnd);
+      if (!copyColumns.length) return;
+      const lines = visibleItems.slice(rowStart, rowEnd + 1).map((item) => copyColumns.map((column) => column.getValue(item).replace(/\s+/g, " ").trim()).join("\t"));
+      if (!lines.length) return;
+      event.preventDefault();
+      const escapeHtml = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+      const html = `<table>${lines.map((line) => `<tr>${line.split("\t").map((value) => `<td>${escapeHtml(value)}</td>`).join("")}</tr>`).join("")}</table>`;
+      event.clipboardData?.setData("text/plain", lines.join("\n"));
+      event.clipboardData?.setData("text/html", html);
+      setTaskGridCopyActive(true);
+    }
+    document.addEventListener("copy", copyTaskGridSelection);
+    return () => document.removeEventListener("copy", copyTaskGridSelection);
+  }, [columnGroupVisibility.progress, projectStatusById, summaryDates, taskGridSelection, visibleItems]);
+
+  useEffect(() => {
+    function pasteTaskGridData(event: ClipboardEvent) {
+      if (!taskGridSelection) return;
+      const text = event.clipboardData?.getData("text/plain") ?? "";
+      if (!text.trim()) return;
+      const matrix = text.replace(/\r/g, "").split("\n").filter((line) => line.length > 0).map((line) => line.split("\t"));
+      const startRow = Math.min(taskGridSelection.anchorRow, taskGridSelection.focusRow);
+      const startColumn = Math.min(taskGridSelection.anchorColumn, taskGridSelection.focusColumn);
+      const targetColumns = [
+        { physicalIndex: 2, apply: (value: string) => value ? { name: value } : {} },
+        { physicalIndex: 3, apply: (value: string) => /^\d+(?:[.,]\d+)?$/.test(value) ? { duration: Math.max(1, Math.trunc(Number(value.replace(",", ".")))) } : {} },
+        { physicalIndex: 4, apply: (value: string) => { const date = normalizePastedDate(value); return date ? { startDate: date } : {}; } },
+        { physicalIndex: 5, apply: (value: string) => { const date = normalizePastedDate(value); return date ? { finishDate: date } : {}; } },
+        { physicalIndex: 7, apply: () => ({}) },
+      ].filter((column) => column.physicalIndex >= startColumn);
+      if (!targetColumns.length) return;
+      let changed = 0;
+      const nextItems = items.map((item, rowIndex) => {
+        const sourceRow = rowIndex - startRow;
+        if (sourceRow < 0 || sourceRow >= matrix.length || item.type !== "task") return item;
+        const changes = matrix[sourceRow].reduce((result, value, sourceColumn) => {
+          const column = targetColumns[sourceColumn];
+          return column ? { ...result, ...column.apply(value.trim()) } : result;
+        }, {} as Partial<ScheduleItem>);
+        if (!Object.keys(changes).length) return item;
+        changed += 1;
+        return { ...item, ...changes };
+      });
+      if (!changed) return;
+      event.preventDefault();
+      commitItems(nextItems, { description: `Dán ${changed} dòng dữ liệu từ Excel`, mergeKey: "paste-task-grid" });
+      onNotice(`Đã dán dữ liệu từ Excel vào ${changed} công tác`);
+    }
+    document.addEventListener("paste", pasteTaskGridData);
+    return () => document.removeEventListener("paste", pasteTaskGridData);
+  }, [commitItems, items, onNotice, taskGridSelection]);
 
   function openTaskContextMenu(event: ReactMouseEvent<HTMLDivElement>, task: ScheduleItem) {
     if (task.type !== "task") return;
@@ -1519,7 +1777,8 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
 
       <div className="schedule-board-body">
       <div className="schedule-board-scroll" onScroll={() => setTaskContextMenu(null)}>
-      <div ref={taskGridBodyScrollRef} className="schedule-table-pane" onScroll={(event) => syncTaskGridHorizontalScroll(event.currentTarget.scrollLeft, "body")}>
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the grid is keyboard focus target for Esc/Ctrl+C */}
+      <div ref={taskGridBodyScrollRef} className="schedule-table-pane" role="application" aria-label="TaskGrid" tabIndex={0} onPointerDown={startTaskGridSelection} onScroll={(event) => syncTaskGridHorizontalScroll(event.currentTarget.scrollLeft, "body")}>
         <div ref={wbsInsertionLineRef} className="wbs-insertion-line" aria-hidden="true" />
         <div className="schedule-rows">
           {visibleItems.map((item) => {
@@ -1541,14 +1800,14 @@ function ScheduleView({ projects, onNotice }: { projects: Project[]; onNotice: (
                   ? <button className="action-slot-add" aria-label="Thêm hạng mục" title="Thêm hạng mục" onClick={() => addChildItem(item)}>+</button>
                   : <>{(item.type === "workItem" || item.type === "group") && <button className="action-slot-add" aria-label="Thêm công tác" title="Thêm công tác" onClick={() => addChildItem(item)}>+</button>}<button className="action-slot-insert-above" aria-label="Chèn lên trên" title="Chèn lên trên" onClick={() => insertScheduleItem(item, "before")}><span className="action-triangle">▲</span></button><button className="action-slot-insert-below" aria-label="Chèn xuống dưới" title="Chèn xuống dưới" onClick={() => insertScheduleItem(item, "after")}><span className="action-triangle">▼</span></button><button className="action-slot-delete" aria-label="Xóa" title="Xóa" onClick={() => deleteItem(item)}><svg className="action-trash-icon" aria-hidden="true" viewBox="0 0 16 16"><path d="M5 5v7m3-7v7m3-7v7M3.5 3.5h9l-.6 10h-7.8l-.6-10ZM6 3.5V2h4v1.5M2.5 3.5h11" /></svg></button></>}
               </div>
-              <div className={`task-name ${autoEditItemId === item.id ? "is-editing" : ""}`} style={{ paddingLeft: `${10 + getScheduleTreeDepth(item, itemById) * 18}px` }} onDoubleClick={(event) => {
+              <div className={`task-name ${autoEditItemId === item.id ? "is-editing" : ""}`} style={{ paddingLeft: `${10 + getScheduleTreeDepth(item, itemById) * 12}px` }} onDoubleClick={(event) => {
                 const target = event.target as HTMLElement;
                 if (target.closest("button, input")) return;
                 event.stopPropagation();
                 setSelectedItemId(item.id);
                 setAutoEditItemId(item.id);
               }}>
-                {expandable ? <button className="tree-toggle" onClick={(event) => { event.stopPropagation(); toggleCollapse(item.id); }}>{collapsedIds.has(item.id) ? "›" : "⌄"}</button> : <span className="tree-spacer" />}
+                {expandable ? <button className="tree-toggle" type="button" aria-label={collapsedIds.has(item.id) ? "Mở rộng" : "Thu gọn"} aria-expanded={!collapsedIds.has(item.id)} onClick={(event) => { event.stopPropagation(); toggleCollapse(item.id); }}><svg viewBox="0 0 16 16" aria-hidden="true"><path d={collapsedIds.has(item.id) ? "m6 3 5 5-5 5" : "m3 6 5 5 5-5"} /></svg></button> : <span className="tree-spacer" />}
                 <InlineNameEditor key={`${item.id}-${autoEditItemId === item.id ? "editing" : "display"}`} value={item.name} autoEdit={autoEditItemId === item.id} onFinishEditing={() => setAutoEditItemId((currentId) => currentId === item.id ? null : currentId)} onCommit={(name) => { setSelectedItemId(item.id); commitItems((current) => current.map((currentItem) => currentItem.id === item.id ? { ...currentItem, name } : currentItem), { description: `Đổi tên ${item.wbs} thành “${name}”` }); onNotice(`Đã đổi tên ${item.wbs}`); }} />{item.nature && autoEditItemId !== item.id && <small>{item.nature}</small>}
               </div>
               {columnGroupVisibility.progress && <>{item.type === "task" ? <><div className="duration-cell"><input aria-label={`Thời lượng ${item.name}`} type="number" min="1" value={item.duration} onFocus={(event) => { setSelectedItemId(item.id); event.currentTarget.select(); }} onChange={(event) => updateDuration(item, Number(event.target.value))} onKeyDown={(event) => { event.stopPropagation(); if (event.key === "Enter") event.currentTarget.blur(); }} /><span>n</span></div>
