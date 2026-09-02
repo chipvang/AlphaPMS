@@ -6,13 +6,13 @@ import { requestApi } from "../api/requestApi";
 import { useUndoRedo } from "../history/useUndoRedo";
 import type { ProjectDto, ProjectScheduleDto } from "../projects/types";
 import type { TaskDependency } from "../schedule/dependencies";
-import { buildProjectSchedulePayload, buildScheduleItems } from "../../components/schedule/ScheduleView";
-import type { ScheduleState } from "../../components/schedule/ScheduleView";
+import { buildProjectSchedulePayload, buildScheduleItems } from "./taskScheduleAdapter";
+import type { TaskState } from "./taskTypes";
 
-const initialState: ScheduleState = { items: [], dependencies: [] };
+const initialState: TaskState = { items: [], dependencies: [] };
 
 export type SharedTaskState = {
-  history: ReturnType<typeof useUndoRedo<ScheduleState>>;
+  history: ReturnType<typeof useUndoRedo<TaskState>>;
   selectedTaskItemId: string;
   setSelectedTaskItemId: (id: string) => void;
   loading: boolean;
@@ -30,7 +30,7 @@ export function useSharedTaskState(projects: ProjectDto[], onNotice: (message: s
     let cancelled = false;
     Promise.all(projects.map((project) => requestApi<ProjectScheduleDto>(`/api/projects/${project.id}/schedule`))).then((groups) => {
       if (cancelled) return;
-      const state: ScheduleState = {
+      const state: TaskState = {
         items: buildScheduleItems(projects, groups.flatMap((group) => group.workItems)),
         dependencies: groups.flatMap((group) => group.dependencies.map((dependency) => ({ id: dependency.id, projectId: dependency.projectId, predecessorTaskId: dependency.predecessorTaskId, successorTaskId: dependency.successorTaskId, dependencyType: dependency.dependencyType, lag: dependency.lagDays } satisfies TaskDependency))),
       };

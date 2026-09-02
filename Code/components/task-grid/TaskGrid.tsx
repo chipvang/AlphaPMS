@@ -4,6 +4,8 @@ import type { PointerEvent, ReactNode, RefObject, UIEvent } from "react";
 import { getTaskGridColumnGroupSpan, getTaskGridColumnWidth } from "./taskGridColumns";
 import type { TaskGridColumn, TaskGridColumnGroup, TaskGridColumnGroupDefinition, TaskGridColumnGroupVisibility } from "./taskGridTypes";
 import { TaskGridRow } from "./TaskGridRow";
+import type { TaskGridRowContext } from "./TaskGridRow";
+import type { TaskItem } from "../../lib/task-workspace/taskTypes";
 
 type TaskGridHeaderProps = {
   visibleColumns: TaskGridColumn[];
@@ -85,9 +87,9 @@ export function TaskGridScrollbar({ scrollRef, tableWidth, onScroll }: TaskGridS
   return <div ref={scrollRef} className="task-grid-scrollbar-dock" aria-hidden="true" onScroll={onScroll}><div className="task-grid-scrollbar-content" style={{ width: tableWidth }} /></div>;
 }
 
-type TaskGridProps<TItem> = TaskGridHeaderProps & {
+export type TaskGridProps<TItem extends TaskItem> = TaskGridHeaderProps & {
   visibleItems: TItem[];
-  rowContext: unknown;
+  rowContext: TaskGridRowContext;
   emptyContent?: ReactNode;
   bodyScrollRef: RefObject<HTMLDivElement | null>;
   insertionLineRef: RefObject<HTMLDivElement | null>;
@@ -102,7 +104,7 @@ type TaskGridProps<TItem> = TaskGridHeaderProps & {
  * Visible shared WBS block. Domain state and interaction handlers are intentionally
  * supplied by the owning workspace during the Step 2A migration.
  */
-export function TaskGrid<TItem>({
+export function TaskGrid<TItem extends TaskItem>({
   visibleItems, rowContext, emptyContent,
   visibleColumns, columnGroups, columnGroupVisibility, onToggleColumnGroup, onShowAllColumnGroups,
   headerScrollRef, onHeaderScroll, nameColumnHeader,
@@ -121,7 +123,7 @@ export function TaskGrid<TItem>({
       nameColumnHeader={nameColumnHeader}
     />
     <TaskGridSurface bodyScrollRef={bodyScrollRef} insertionLineRef={insertionLineRef} onBodyPointerDown={onBodyPointerDown} onBodyScroll={onBodyScroll}>
-      {visibleItems.map((item) => <TaskGridRow key={(item as { id: string }).id} item={item} context={rowContext} />)}
+      {visibleItems.map((item) => <TaskGridRow key={item.id} item={item} context={rowContext} visibleColumns={visibleColumns} />)}
       {!visibleItems.length && emptyContent}
     </TaskGridSurface>
     <TaskGridScrollbar scrollRef={bottomScrollRef} tableWidth={tableWidth} onScroll={onBottomScroll} />

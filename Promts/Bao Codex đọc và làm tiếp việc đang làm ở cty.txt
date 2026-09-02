@@ -1,0 +1,3 @@
+Đọc AGENTS.md, Docs/Readme.md và Docs/Codex_Handoff.md.
+Kiểm tra git status và commit gần nhất.
+Tiếp tục đúng phần “Đang dở”, không lặp lại phần đã hoàn thành.

@@ -29,10 +29,12 @@ test("server-renders the AlphaPMS application shell", async () => {
 });
 
 test("keeps the committed schedule interaction contract", async () => {
-  const [schedule, ganttTimeline, taskGridController, taskGridCore, taskGridRow, taskGridColumns, css, layout, dependencies] = await Promise.all([
+  const [schedule, ganttTimeline, taskGridController, taskGridInteractions, taskGridWbsReorder, taskGridCore, taskGridRow, taskGridColumns, css, layout, dependencies] = await Promise.all([
     readFile(new URL("../components/schedule/ScheduleView.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/schedule/GanttTimeline.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/task-grid/useTaskGridController.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/task-grid/useTaskGridInteractions.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/task-grid/useTaskGridWbsReorder.ts", import.meta.url), "utf8"),
     readFile(new URL("../components/task-grid/TaskGrid.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/task-grid/TaskGridRow.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/task-grid/taskGridColumns.ts", import.meta.url), "utf8"),
@@ -41,7 +43,7 @@ test("keeps the committed schedule interaction contract", async () => {
     readFile(new URL("../lib/schedule/dependencies.ts", import.meta.url), "utf8"),
   ]);
 
-  const scheduleContract = `${schedule}${ganttTimeline}${taskGridController}${taskGridCore}${taskGridRow}${taskGridColumns}`;
+  const scheduleContract = `${schedule}${ganttTimeline}${taskGridController}${taskGridInteractions}${taskGridWbsReorder}${taskGridCore}${taskGridRow}${taskGridColumns}`;
 
   assert.match(scheduleContract, /const \[outlineLevel, setOutlineLevel\] = useState\(4\)/);
   assert.match(scheduleContract, /aria-label="Chèn lên trên"/);
@@ -69,7 +71,7 @@ test("keeps the committed schedule interaction contract", async () => {
   assert.match(scheduleContract, /Math\.hypot\([\s\S]*>= 4/);
   assert.match(scheduleContract, /buildTreeInsertionSlots\(items, visibleItems\.map/);
   assert.match(scheduleContract, /moveTreeItemToSlot\(items, currentDrag\.sourceId, preview\)/);
-  assert.match(scheduleContract, /commitItems\(recalculateScheduleWbs\(moved\)/);
+  assert.match(scheduleContract, /commitItems\(recalculateTaskWbs\(moved\)/);
   assert.match(css, /\.wbs-cell\.wbs-drag-cell \{[\s\S]*cursor:\s*grab/);
   assert.match(scheduleContract, /ref=\{insertionLineRef\} className="wbs-insertion-line"/);
   assert.match(css, /\.wbs-insertion-line \{[\s\S]*position:\s*fixed;[\s\S]*height:\s*2px/);
@@ -80,8 +82,8 @@ test("keeps the committed schedule interaction contract", async () => {
   assert.match(scheduleContract, /useCommonDialog/);
   assert.match(scheduleContract, /commonDialog\.confirm/);
   assert.doesNotMatch(scheduleContract, /globalThis\.confirm|window\.confirm/);
-  assert.match(scheduleContract, /const minimumTaskNameColumnWidth = 350/);
-  assert.match(scheduleContract, /createTaskGridColumns<ScheduleItem>\(\{/);
+  assert.match(taskGridInteractions, /const minimumTaskNameColumnWidth = 350/);
+  assert.match(scheduleContract, /createTaskGridColumns<TaskItem>\(\{/);
   assert.match(scheduleContract, /createBasicColumns/);
   assert.match(scheduleContract, /createScheduleColumns/);
   assert.match(css, /\.duration-cell input \{[\s\S]*width:\s*50px/);
@@ -91,7 +93,8 @@ test("keeps the committed schedule interaction contract", async () => {
   assert.match(css, /\.task-context-menu \{/);
   assert.match(scheduleContract, /7 \* ganttDayStep/);
   assert.match(scheduleContract, /summary-progress-line/);
-  assert.match(scheduleContract, /calculateScheduleOrder/);
+  assert.match(schedule, /calculateTaskOrder/);
+  assert.doesNotMatch(schedule, /function calculateScheduleOrder/);
   assert.match(scheduleContract, /basic: true, progress: true, estimate: false, resource: false/);
   assert.match(scheduleContract, /aria-label="Nhóm cột TaskGrid"/);
   assert.doesNotMatch(scheduleContract, />Cơ bản<\/button>/);

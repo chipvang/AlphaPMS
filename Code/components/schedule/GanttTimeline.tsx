@@ -2,7 +2,7 @@
 
 import type { PointerEvent, RefObject, UIEvent } from "react";
 import type { TaskDependency } from "../../lib/schedule/dependencies";
-import type { ScheduleItem } from "./ScheduleView";
+import type { TaskItem } from "../../lib/task-workspace/taskTypes";
 
 export type GanttTimelineData = {
   startDate: Date;
@@ -20,14 +20,14 @@ export function GanttTimelineHeader({ timeline, dayStep, columnWidth, scrollRef,
 
 type GanttTimelineProps = {
   timeline: GanttTimelineData | null;
-  items: ScheduleItem[];
+  items: TaskItem[];
   selectedItemId: string;
   dependencies: TaskDependency[];
   selectedDependencyId: string | null;
   onSelectItem: (id: string) => void;
   onSelectDependency: (id: string, doubleClick: boolean) => void;
   getDependencyGeometry: (taskId: string) => { left: number; width: number; y: number } | null;
-  getRowBar: (item: ScheduleItem, rowIndex: number) => { left: number; width: number; hasBar: boolean; startDate: string; finishDate: string };
+  getRowBar: (item: TaskItem, rowIndex: number) => { left: number; width: number; hasBar: boolean; startDate: string; finishDate: string };
   columnWidth: number;
   dayStep: number;
   formatDate: (date: Date) => string;
@@ -36,8 +36,8 @@ type GanttTimelineProps = {
   bottomScrollRef: RefObject<HTMLDivElement | null>;
   contentRef: RefObject<HTMLDivElement | null>;
   dependencyDrag: { sourceTaskId: string; sourcePoint: { x: number; y: number }; pointerPosition: { x: number; y: number }; hasExceededThreshold: boolean } | null;
-  onStartDependencyDrag: (event: PointerEvent<HTMLSpanElement>, item: ScheduleItem, left: number, width: number, rowIndex: number) => void;
-  isValidDependencyTarget: (item: ScheduleItem) => boolean;
+  onStartDependencyDrag: (event: PointerEvent<HTMLSpanElement>, item: TaskItem, left: number, width: number, rowIndex: number) => void;
+  isValidDependencyTarget: (item: TaskItem) => boolean;
   onScroll: (event: UIEvent<HTMLDivElement>) => void;
 };
 

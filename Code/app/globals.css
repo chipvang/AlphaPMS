@@ -3041,19 +3041,6 @@ button {
 .estimate-search input { width: 100%; border: 0; outline: 0; background: transparent; font-size: 12px; }
 
 .estimate-shared-task-grid { border: 0; border-radius: 0; background: transparent; }
-.estimate-shared-task-grid .schedule-screen { min-height: 0; }
-.estimate-task-grid .schedule-toolbar,
-.estimate-task-grid .schedule-legend,
-.estimate-task-grid .schedule-detail,
-.estimate-task-grid .schedule-detail-collapsed,
-.estimate-task-grid .gantt-pane,
-.estimate-task-grid .gantt-scrollbar-row > :last-child { display: none; }
-.estimate-task-grid .schedule-board-header,
-.estimate-task-grid .schedule-board-body,
-.estimate-task-grid .schedule-board-scroll,
-.estimate-task-grid .gantt-scrollbar-row { grid-template-columns: minmax(0, 1fr); }
-.estimate-task-grid .schedule-board-scroll,
-.estimate-task-grid .task-grid-scrollbar-dock { grid-column: 1; }
 
 .estimate-table-wrap { min-height: 0; flex: 1; overflow: auto; }
 .estimate-data-grid { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 11px; }

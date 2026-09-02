@@ -3,10 +3,12 @@
 import { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { requestApi } from "../../lib/api/requestApi";
-import type { ProjectDto, ProjectScheduleDto, WorkItemDto } from "../../lib/projects/types";
+import type { ProjectDto, ProjectScheduleDto } from "../../lib/projects/types";
 import type { SharedTaskState } from "../../lib/task-workspace/useSharedTaskState";
+import type { TaskItem, TaskItemType } from "../../lib/task-workspace/taskTypes";
+import { buildProjectSchedulePayload } from "../../lib/task-workspace/taskScheduleAdapter";
+import type { ScheduleDisplayStatus } from "../../lib/schedule/scheduleTypes";
 import { DependencyType, formatDependencyLabel, propagateDependencySchedule, recalibrateIncomingDependencyLags, TaskDependency, validateTaskDependency } from "../../lib/schedule/dependencies";
-import { buildTreeInsertionSlots, moveTreeItemToSlot, TreeInsertionSlot } from "../../lib/schedule/treeReorder";
 import { convertTaskToGroupWithFollowingTasks } from "../../lib/schedule/taskConversion";
 import { useCommonDialog } from "../../lib/ui/useCommonDialog";
 import {
@@ -20,53 +22,17 @@ import {
   taskGridColumnGroups,
 } from "../task-grid/taskGridColumns";
 import type { TaskGridColumn, TaskGridColumnGroup } from "../task-grid/taskGridTypes";
-import { TaskGrid as TaskGridPresentation } from "../task-grid/TaskGrid";
+import { TaskGrid } from "../task-grid/TaskGrid";
 import { useTaskGridController } from "../task-grid/useTaskGridController";
+import { useTaskGridInteractions } from "../task-grid/useTaskGridInteractions";
+import { useTaskGridWbsReorder } from "../task-grid/useTaskGridWbsReorder";
+import { calculateTaskOrder, getTaskTreeDepth } from "../task-grid/taskTree";
+import { insertTaskChild, insertTaskSibling, recalculateTaskWbs, removeTaskSubtree } from "../task-grid/taskTree";
 import { GanttTimeline } from "./GanttTimeline";
 import { ScheduleBoard } from "./ScheduleBoard";
 
 type Project = ProjectDto;
 type ProjectStatus = ProjectDto["status"];
-type ScheduleDisplayStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "PAUSED" | "ON_HOLD" | "CANCELLED";
-type ScheduleItemType = "project" | "workItem" | "group" | "task";
-
-export type ScheduleItem = {
-  id: string;
-  projectId: string;
-  parentId: string | null;
-  type: ScheduleItemType;
-  wbs: string;
-  name: string;
-  duration: number;
-  startDate: string;
-  finishDate: string;
-  progress: number;
-  ganttLeft: number;
-  ganttWidth: number;
-  sortOrder?: number;
-  nature?: string;
-  critical?: boolean;
-  delayed?: boolean;
-  unit?: string;
-  quantity?: number;
-  machineShiftCoefficient?: number;
-  machineCount?: number;
-  managedLabor?: number;
-  permanentLabor?: number;
-  allocation?: {
-    code: string;
-    name: string;
-    allocated: number;
-    total: number;
-    unit: string;
-  };
-};
-
-export type ScheduleState = {
-  items: ScheduleItem[];
-  dependencies: TaskDependency[];
-};
-
 type DependencyDraft = Pick<TaskDependency, "id" | "predecessorTaskId" | "dependencyType" | "lag">;
 type DependencyDragState = {
   sourceTaskId: string;
@@ -75,14 +41,6 @@ type DependencyDragState = {
   initialPointerPosition: { x: number; y: number };
   hasExceededThreshold: boolean;
 };
-type WbsDragState = {
-  sourceId: string;
-  pointerId: number;
-  startX: number;
-  startY: number;
-  isActive: boolean;
-};
-type WbsSlotGeometry = TreeInsertionSlot & { x: number; y: number };
 type TaskContextMenuState = { taskId: string; x: number; y: number };
 
 const scheduleStatusPresentation: Record<ScheduleDisplayStatus, { label: string; icon: "circle" | "play" | "check" | "pause" | "clock" | "cancel" }> = {
@@ -95,8 +53,6 @@ const scheduleStatusPresentation: Record<ScheduleDisplayStatus, { label: string;
 };
 
 const ganttColumnWidth = 20;
-const minimumTaskNameColumnWidth = 350;
-const maximumTaskNameColumnWidth = 700;
 const scheduleRowHeight = 32;
 
 function getProjectScheduleStatus(status: ProjectStatus | undefined): ScheduleDisplayStatus {
@@ -114,18 +70,6 @@ function formatOptionalNumber(value?: number) {
   return value == null ? "—" : new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(value);
 }
 
-function isoToDisplayDate(value: string) {
-  if (!value) return "";
-  const [year, month, day] = value.split("-");
-  return year && month && day ? `${day}/${month}/${year.slice(-2)}` : value;
-}
-
-function displayToIsoDate(value: string) {
-  const parsed = parseDisplayDate(value);
-  if (!parsed) return "";
-  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
-}
-
 function createEntityId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
@@ -134,136 +78,13 @@ function createEntityId() {
   });
 }
 
-export function buildScheduleItems(projects: Project[], records: WorkItemDto[]) {
-  const byProject = new Map<string, WorkItemDto[]>();
-  records.forEach((record) => byProject.set(record.projectId, [...(byProject.get(record.projectId) ?? []), record]));
-  const result: ScheduleItem[] = [];
-  projects.forEach((project, projectIndex) => {
-    result.push({ id: project.id, projectId: project.id, parentId: null, type: "project", wbs: String.fromCharCode(65 + projectIndex), name: project.name.toLocaleUpperCase("vi"), duration: 1, startDate: isoToDisplayDate(project.startDate), finishDate: isoToDisplayDate(project.finishDate), progress: project.progress, ganttLeft: 0, ganttWidth: 1 });
-    const projectItems = byProject.get(project.id) ?? [];
-    const children = new Map<string | null, WorkItemDto[]>();
-    projectItems.forEach((item) => children.set(item.parentId, [...(children.get(item.parentId) ?? []), item]));
-    children.forEach((items) => items.sort((a, b) => a.sortOrder - b.sortOrder));
-    const append = (parentId: string | null, uiParentId: string) => {
-      (children.get(parentId) ?? []).forEach((item) => {
-        result.push({ ...item, parentId: uiParentId, wbs: "", startDate: isoToDisplayDate(item.startDate), finishDate: isoToDisplayDate(item.finishDate), machineShiftCoefficient: item.machineShiftFactor, managedLabor: item.nclm, ganttLeft: 0, ganttWidth: 1 });
-        append(item.id, item.id);
-      });
-    };
-    append(null, project.id);
-  });
-  return recalculateScheduleWbs(result);
-}
-
-export function buildProjectSchedulePayload(projectId: string, items: ScheduleItem[], dependencies: TaskDependency[]) {
-  const siblingCounts = new Map<string, number>();
-  return {
-    workItems: items.filter((item) => item.projectId === projectId && item.type !== "project").map((item) => {
-      const parentId = item.parentId === projectId ? null : item.parentId;
-      const siblingKey = parentId ?? "root";
-      const sortOrder = (siblingCounts.get(siblingKey) ?? 0) + 1;
-      siblingCounts.set(siblingKey, sortOrder);
-      return {
-        id: item.id, projectId, parentId, type: item.type, name: item.name,
-        unit: item.type === "task" ? item.unit : null,
-        quantity: item.type === "task" ? item.quantity : null,
-        startDate: item.type === "task" ? displayToIsoDate(item.startDate) : null,
-        finishDate: item.type === "task" ? displayToIsoDate(item.finishDate) : null,
-        duration: item.type === "task" ? item.duration : 1,
-        progress: item.type === "task" ? item.progress : 0,
-        machineShiftFactor: item.type === "task" ? item.machineShiftCoefficient : null,
-        nclm: item.type === "task" ? item.managedLabor : null,
-        permanentLabor: item.type === "task" ? item.permanentLabor : null,
-        sortOrder,
-      };
-    }),
-    dependencies: dependencies.filter((dependency) => dependency.projectId === projectId).map((dependency) => ({
-      predecessorTaskId: dependency.predecessorTaskId,
-      successorTaskId: dependency.successorTaskId,
-      dependencyType: dependency.dependencyType,
-      lagDays: dependency.lag,
-    })),
-  };
-}
-
-function isScheduleDescendant(item: ScheduleItem, ancestorId: string, itemMap: Map<string, ScheduleItem>) {
+function isScheduleDescendant(item: TaskItem, ancestorId: string, itemMap: Map<string, TaskItem>) {
   let parentId = item.parentId;
   while (parentId) {
     if (parentId === ancestorId) return true;
     parentId = itemMap.get(parentId)?.parentId ?? null;
   }
   return false;
-}
-
-function getScheduleTreeDepth(item: ScheduleItem, itemMap: Map<string, ScheduleItem>) {
-  let depth = 0;
-  let parentId = item.parentId;
-  while (parentId) {
-    depth += 1;
-    parentId = itemMap.get(parentId)?.parentId ?? null;
-  }
-  return depth;
-}
-
-function recalculateScheduleWbs(items: ScheduleItem[]) {
-  const nextItemMap = new Map<string, ScheduleItem>();
-  const childCounts = new Map<string, number>();
-  return items.map((item) => {
-    if (!item.parentId) {
-      const root = { ...item };
-      nextItemMap.set(root.id, root);
-      return root;
-    }
-    const parent = nextItemMap.get(item.parentId);
-    const childNumber = (childCounts.get(item.parentId) ?? 0) + 1;
-    childCounts.set(item.parentId, childNumber);
-    const nextItem = { ...item, wbs: `${parent?.wbs ?? item.wbs}.${childNumber}` };
-    nextItemMap.set(nextItem.id, nextItem);
-    return nextItem;
-  });
-}
-
-function toRoman(value: number) {
-  const symbols: Array<[number, string]> = [[1000, "M"], [900, "CM"], [500, "D"], [400, "CD"], [100, "C"], [90, "XC"], [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]];
-  let remaining = Math.max(1, Math.trunc(value));
-  return symbols.reduce((result, [number, symbol]) => {
-    while (remaining >= number) {
-      result += symbol;
-      remaining -= number;
-    }
-    return result;
-  }, "");
-}
-
-function toAlphabeticOrder(value: number) {
-  let remaining = Math.max(1, Math.trunc(value));
-  let result = "";
-  while (remaining > 0) {
-    remaining -= 1;
-    result = String.fromCharCode(65 + (remaining % 26)) + result;
-    remaining = Math.floor(remaining / 26);
-  }
-  return result;
-}
-
-function calculateScheduleOrder(items: ScheduleItem[]) {
-  const result = new Map<string, string>();
-  const siblingCounters = new Map<string, number>();
-  let projectIndex = 0;
-  items.forEach((item) => {
-    if (item.type === "project") {
-      projectIndex += 1;
-      result.set(item.id, toAlphabeticOrder(projectIndex));
-      return;
-    }
-    const parentKey = `${item.parentId ?? item.projectId}:${item.type}`;
-    const siblingIndex = (siblingCounters.get(parentKey) ?? 0) + 1;
-    siblingCounters.set(parentKey, siblingIndex);
-    if (item.type === "workItem") result.set(item.id, toRoman(siblingIndex));
-    else if (item.type === "group") result.set(item.id, `${result.get(item.parentId ?? "") ?? "I"}.${siblingIndex}`);
-    else result.set(item.id, String(siblingIndex));
-  });
-  return result;
 }
 
 function parseDisplayDate(value: string) {
@@ -572,7 +393,7 @@ type ScheduleViewProps = {
   className?: string;
 };
 
-export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleViewProps) {
+export function ScheduleWorkspace({ projects, onNotice, taskState, className }: ScheduleViewProps) {
   const scheduleHistory = taskState.history;
   const { persistedProjectFingerprintsRef } = taskState;
   const { items, dependencies } = scheduleHistory.value;
@@ -583,15 +404,8 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
   const [dependencySearch, setDependencySearch] = useState("");
   const [dependencyEditorError, setDependencyEditorError] = useState("");
   const [dependencyDrag, setDependencyDrag] = useState<DependencyDragState | null>(null);
-  const [wbsDrag, setWbsDrag] = useState<WbsDragState | null>(null);
-  const wbsDragRef = useRef<WbsDragState | null>(null);
-  const wbsDropPreviewRef = useRef<TreeInsertionSlot | null>(null);
-  const wbsSlotGeometriesRef = useRef<WbsSlotGeometry[]>([]);
-  const wbsCaptureElementRef = useRef<HTMLDivElement | null>(null);
-  const wbsInsertionLineRef = useRef<HTMLDivElement | null>(null);
-  const suppressWbsClickRef = useRef(false);
   const taskGridController = useTaskGridController();
-  const { collapsedIds, setCollapsedIds, outlineLevel, setOutlineLevel, taskNameColumnWidth, setTaskNameColumnWidth, columnGroupVisibility, setColumnGroupVisibility, taskGridSelection, setTaskGridSelection, taskGridCopyActive, setTaskGridCopyActive, taskGridSelectingRef, taskGridSelectionRef, taskGridFillSourceRef, taskGridFillModeRef, taskGridHandleDragRef, taskGridCtrlRef, taskGridHeaderScrollRef, taskGridBodyScrollRef, taskGridBottomScrollRef } = taskGridController;
+  const { collapsedIds, setCollapsedIds, outlineLevel, setOutlineLevel, taskNameColumnWidth, columnGroupVisibility, setColumnGroupVisibility, taskGridSelection, setTaskGridSelection, setTaskGridCopyActive, taskGridSelectingRef, taskGridSelectionRef, taskGridFillSourceRef, taskGridFillModeRef, taskGridHandleDragRef, taskGridCtrlRef, taskGridHeaderScrollRef, taskGridBodyScrollRef, taskGridBottomScrollRef } = taskGridController;
   const commonDialog = useCommonDialog();
   const [autoEditItemId, setAutoEditItemId] = useState<string | null>(null);
   const [taskDetailMode, setTaskDetailMode] = useState<"docked" | "collapsed" | "hidden">("docked");
@@ -606,7 +420,7 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
   const visibleProjectIds = useMemo(() => new Set(projects.filter((project) => project.visible).map((project) => project.id)), [projects]);
   const projectStatusById = useMemo(() => new Map(projects.map((project) => [project.id, project.status])), [projects]);
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
-  const scheduleOrder = useMemo(() => calculateScheduleOrder(items), [items]);
+  const scheduleOrder = useMemo(() => calculateTaskOrder(items), [items]);
   const incomingDependencies = useMemo(() => {
     const result = new Map<string, TaskDependency[]>();
     dependencies.forEach((dependency) => result.set(dependency.successorTaskId, [...(result.get(dependency.successorTaskId) ?? []), dependency]));
@@ -628,7 +442,7 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
   }, [itemById, items]);
   const visibleItems = useMemo(() => items.filter((item) => {
     if (!visibleProjectIds.has(item.projectId)) return false;
-    if (getScheduleTreeDepth(item, itemById) + 1 > outlineLevel) return false;
+    if (getTaskTreeDepth(item, itemById) + 1 > outlineLevel) return false;
     let parentId = item.parentId;
     while (parentId) {
       if (collapsedIds.has(parentId)) return false;
@@ -705,12 +519,12 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     if (ganttHeaderScrollRef.current) ganttHeaderScrollRef.current.scrollLeft = 0;
     if (ganttBottomScrollRef.current) ganttBottomScrollRef.current.scrollLeft = 0;
   }, [timelineStartTime, visibleProjectKey]);
-  const scheduleTaskGridColumns = useMemo<TaskGridColumn<ScheduleItem>[]>(() => createTaskGridColumns<ScheduleItem>({
-    basicColumns: createBasicColumns<ScheduleItem>({
+  const scheduleTaskGridColumns = useMemo<TaskGridColumn<TaskItem>[]>(() => createTaskGridColumns<TaskItem>({
+    basicColumns: createBasicColumns<TaskItem>({
       getNameCopyValue: (item) => item.name,
       applyNamePasteValue: (value) => value ? { name: value } : {},
     }),
-    scheduleColumns: createScheduleColumns<ScheduleItem>({
+    scheduleColumns: createScheduleColumns<TaskItem>({
       getDurationCopyValue: (item) => item.type === "task" ? String(item.duration) : String(summaryDates.get(item.id)?.duration ?? ""),
       applyDurationPasteValue: (value) => /^\d+(?:[.,]\d+)?$/.test(value) ? { duration: Math.max(1, Math.trunc(Number(value.replace(",", ".")))) } : {},
       getStartDateCopyValue: (item) => item.type === "task" ? item.startDate : summaryDates.get(item.id)?.startDate ?? "",
@@ -725,8 +539,8 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
       },
       getStatusCopyValue: (item) => scheduleStatusPresentation[(item.type === "project" ? getProjectScheduleStatus(projectStatusById.get(item.projectId)) : "NOT_STARTED")].label,
     }),
-    estimateColumns: estimateColumns as TaskGridColumn<ScheduleItem>[],
-    resourceColumns: resourceColumns as TaskGridColumn<ScheduleItem>[],
+    estimateColumns: estimateColumns as TaskGridColumn<TaskItem>[],
+    resourceColumns: resourceColumns as TaskGridColumn<TaskItem>[],
   }), [projectStatusById, summaryDates]);
   const visibleTaskGridColumns = getVisibleTaskGridColumns(scheduleTaskGridColumns, columnGroupVisibility, taskNameColumnWidth);
   const scheduleTableWidth = getTaskGridColumnWidth(visibleTaskGridColumns);
@@ -779,114 +593,31 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     setColumnGroupVisibility((current) => ({ ...current, [group]: !current[group] }));
   }
 
-  function syncTaskGridHorizontalScroll(scrollLeft: number, source: "header" | "body" | "dock") {
-    const targets = [
-      source === "header" ? null : taskGridHeaderScrollRef.current,
-      source === "body" ? null : taskGridBodyScrollRef.current,
-      source === "dock" ? null : taskGridBottomScrollRef.current,
-    ];
-    targets.forEach((target) => {
-      if (target && Math.abs(target.scrollLeft - scrollLeft) > 1) target.scrollLeft = scrollLeft;
-    });
-  }
-
-  const commitItems = useCallback((next: ScheduleItem[] | ((current: ScheduleItem[]) => ScheduleItem[]), options: { description: string; mergeKey?: string }) => {
+  const commitItems = useCallback((next: TaskItem[] | ((current: TaskItem[]) => TaskItem[]), options: { description: string; mergeKey?: string }) => {
     scheduleHistory.commit((current) => ({
       ...current,
       items: typeof next === "function" ? next(current.items) : next,
     }), options);
   }, [scheduleHistory]);
-
-  function getTaskGridCellFromPoint(clientX: number, clientY: number) {
-    const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
-    const cell = target?.closest<HTMLElement>(".schedule-row > div");
-    const row = cell?.parentElement;
-    if (!cell || !row || cell.classList.contains("wbs-cell") || target?.closest("button, input, select, textarea")) return null;
-    const rowIndex = Array.from(row.parentElement?.children ?? []).indexOf(row);
-    const columnIndex = Array.from(row.children).indexOf(cell);
-    return rowIndex >= 0 && columnIndex >= 0 ? { rowIndex, columnIndex } : null;
-  }
-
-  function startTaskGridSelection(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.button !== 0) return;
-    const cell = getTaskGridCellFromPoint(event.clientX, event.clientY);
-    if (!cell) return;
-    event.preventDefault();
-    event.currentTarget.focus();
-    const selected = taskGridSelection;
-    const selectedRow = selected ? Math.max(selected.anchorRow, selected.focusRow) : -1;
-    const selectedColumn = selected ? Math.max(selected.anchorColumn, selected.focusColumn) : -1;
-    const targetElement = event.target as HTMLElement;
-    const targetRect = targetElement.closest<HTMLElement>(".schedule-row > div")?.getBoundingClientRect();
-    if (selected && cell.rowIndex === selectedRow && cell.columnIndex === selectedColumn && targetRect && event.clientX >= targetRect.right - 8 && event.clientY >= targetRect.bottom - 8) {
-      taskGridFillModeRef.current = event.ctrlKey;
-      taskGridFillSourceRef.current = selected;
-      taskGridHandleDragRef.current = true;
-      taskGridSelectingRef.current = true;
-      return;
-    }
-    taskGridSelectingRef.current = true;
-    setTaskGridCopyActive(false);
-    taskGridHandleDragRef.current = false;
-    taskGridFillModeRef.current = false;
-    taskGridFillSourceRef.current = null;
-    taskGridSelectionRef.current = { anchorRow: cell.rowIndex, anchorColumn: cell.columnIndex, focusRow: cell.rowIndex, focusColumn: cell.columnIndex };
-    setTaskGridSelection({ anchorRow: cell.rowIndex, anchorColumn: cell.columnIndex, focusRow: cell.rowIndex, focusColumn: cell.columnIndex });
-  }
+  const { wbsDrag, wbsInsertionLineRef, suppressWbsClickRef, startWbsDrag } = useTaskGridWbsReorder({
+    items,
+    visibleItems,
+    bodyScrollRef: taskGridBodyScrollRef,
+    setSelectedItemId,
+    commitItems,
+    onNotice,
+  });
+  const { startTaskGridSelection, syncTaskGridHorizontalScroll, startTaskNameColumnResize } = useTaskGridInteractions({
+    visibleItems,
+    allItems: items,
+    visibleColumns: visibleTaskGridColumns,
+    taskGridController,
+    bodyScrollRef: taskGridBodyScrollRef,
+    commitItems,
+    onNotice,
+  });
 
   useEffect(() => {
-    function updateTaskGridSelection(event: globalThis.PointerEvent) {
-      if (!taskGridSelectingRef.current) return;
-      if (taskGridHandleDragRef.current && (event.ctrlKey || taskGridCtrlRef.current)) taskGridFillModeRef.current = true;
-      const cell = getTaskGridCellFromPoint(event.clientX, event.clientY);
-      if (cell) setTaskGridSelection((current) => {
-        if (!current) return current;
-        const next = { ...current, focusRow: cell.rowIndex, focusColumn: cell.columnIndex };
-        taskGridSelectionRef.current = next;
-        return next;
-      });
-    }
-    function finishTaskGridSelection(event: globalThis.PointerEvent) {
-      if (event.ctrlKey || taskGridCtrlRef.current) taskGridFillModeRef.current = true;
-      if (taskGridSelectingRef.current && taskGridFillModeRef.current && taskGridFillSourceRef.current && taskGridSelectionRef.current) {
-        const source = taskGridFillSourceRef.current;
-        const target = taskGridSelectionRef.current;
-        const sourceRowStart = Math.min(source.anchorRow, source.focusRow);
-        const sourceRowEnd = Math.max(source.anchorRow, source.focusRow);
-        const sourceColumnStart = Math.min(source.anchorColumn, source.focusColumn);
-        const sourceColumnEnd = Math.max(source.anchorColumn, source.focusColumn);
-        const targetRowStart = Math.min(target.anchorRow, target.focusRow);
-        const targetRowEnd = Math.max(target.anchorRow, target.focusRow);
-        const targetColumnStart = Math.min(target.anchorColumn, target.focusColumn);
-        const targetColumnEnd = Math.max(target.anchorColumn, target.focusColumn);
-        const allowedColumns = new Set([2, 3, 4, 5]);
-        const nextItems = items.map((item, rowIndex) => {
-          if (item.type !== "task" || rowIndex < targetRowStart || rowIndex > targetRowEnd) return item;
-          const sourceRow = sourceRowStart + ((rowIndex - sourceRowStart) % Math.max(1, sourceRowEnd - sourceRowStart + 1));
-          const sourceItem = items[sourceRow];
-          if (!sourceItem || sourceItem.type !== "task") return item;
-          const changes: Partial<ScheduleItem> = {};
-          for (let column = targetColumnStart; column <= targetColumnEnd; column += 1) {
-            if (!allowedColumns.has(column)) continue;
-            const sourceColumn = sourceColumnStart + ((column - sourceColumnStart) % Math.max(1, sourceColumnEnd - sourceColumnStart + 1));
-            const value = sourceColumn === 2 ? sourceItem.name : sourceColumn === 3 ? String(sourceItem.duration) : sourceColumn === 4 ? sourceItem.startDate : sourceItem.finishDate;
-            if (column === 2) changes.name = value;
-            if (column === 3 && /^\d+$/.test(value)) changes.duration = Math.max(1, Number(value));
-            if (column === 4) changes.startDate = normalizePastedDate(value) ?? item.startDate;
-            if (column === 5) changes.finishDate = normalizePastedDate(value) ?? item.finishDate;
-          }
-          return { ...item, ...changes };
-        });
-        if (nextItems.some((item, index) => item !== items[index])) commitItems(nextItems, { description: "Sao chép vùng dữ liệu trong TaskGrid", mergeKey: "fill-task-grid" });
-      }
-      taskGridSelectingRef.current = false;
-      taskGridFillModeRef.current = false;
-      taskGridFillSourceRef.current = null;
-      taskGridHandleDragRef.current = false;
-    }
-    document.addEventListener("pointermove", updateTaskGridSelection);
-    document.addEventListener("pointerup", finishTaskGridSelection);
-    document.addEventListener("pointercancel", finishTaskGridSelection);
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Control") taskGridCtrlRef.current = true;
       if (event.key === "Escape") {
@@ -905,13 +636,10 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("keyup", onKeyUp);
     return () => {
-      document.removeEventListener("pointermove", updateTaskGridSelection);
-      document.removeEventListener("pointerup", finishTaskGridSelection);
-      document.removeEventListener("pointercancel", finishTaskGridSelection);
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("keyup", onKeyUp);
     };
-  }, [commitItems, items]);
+  }, []);
 
   useEffect(() => { taskGridSelectionRef.current = taskGridSelection; }, [taskGridSelection]);
 
@@ -928,84 +656,7 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     return () => document.removeEventListener("pointerdown", clearTaskGridSelection);
   }, []);
 
-  useEffect(() => {
-    const rowStart = taskGridSelection ? Math.min(taskGridSelection.anchorRow, taskGridSelection.focusRow) : -1;
-    const rowEnd = taskGridSelection ? Math.max(taskGridSelection.anchorRow, taskGridSelection.focusRow) : -1;
-    const columnStart = taskGridSelection ? Math.min(taskGridSelection.anchorColumn, taskGridSelection.focusColumn) : -1;
-    const columnEnd = taskGridSelection ? Math.max(taskGridSelection.anchorColumn, taskGridSelection.focusColumn) : -1;
-    document.querySelectorAll<HTMLElement>(".schedule-row").forEach((row, rowIndex) => {
-      Array.from(row.children).forEach((cell, columnIndex) => {
-        const selected = rowIndex >= rowStart && rowIndex <= rowEnd && columnIndex >= columnStart && columnIndex <= columnEnd;
-        cell.classList.toggle("task-grid-cell-selected", selected);
-        cell.classList.toggle("task-grid-cell-selection-top", selected && rowIndex === rowStart);
-        cell.classList.toggle("task-grid-cell-selection-bottom", selected && rowIndex === rowEnd);
-        cell.classList.toggle("task-grid-cell-selection-left", selected && columnIndex === columnStart);
-        cell.classList.toggle("task-grid-cell-selection-right", selected && columnIndex === columnEnd);
-        cell.classList.toggle("task-grid-cell-copying", selected && taskGridCopyActive);
-      });
-    });
-  }, [taskGridCopyActive, taskGridSelection, visibleItems.length, columnGroupVisibility]);
-
-  useEffect(() => {
-    function copyTaskGridSelection(event: ClipboardEvent) {
-      if (!taskGridSelection) return;
-      const rowStart = Math.min(taskGridSelection.anchorRow, taskGridSelection.focusRow);
-      const rowEnd = Math.max(taskGridSelection.anchorRow, taskGridSelection.focusRow);
-      const columnStart = Math.min(taskGridSelection.anchorColumn, taskGridSelection.focusColumn);
-      const columnEnd = Math.max(taskGridSelection.anchorColumn, taskGridSelection.focusColumn);
-      const copyColumns = visibleTaskGridColumns
-        .map((column, physicalIndex) => ({ column, physicalIndex }))
-        .filter(({ column, physicalIndex }) => column.copyable && column.getCopyValue && physicalIndex >= columnStart && physicalIndex <= columnEnd);
-      if (!copyColumns.length) return;
-      const lines = visibleItems
-        .slice(rowStart, rowEnd + 1)
-        .map((item) => copyColumns.map(({ column }) => (column.getCopyValue?.(item) ?? "").replace(/\s+/g, " ").trim()).join("\t"));
-      if (!lines.length) return;
-      event.preventDefault();
-      const escapeHtml = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
-      const html = `<table>${lines.map((line) => `<tr>${line.split("\t").map((value) => `<td>${escapeHtml(value)}</td>`).join("")}</tr>`).join("")}</table>`;
-      event.clipboardData?.setData("text/plain", lines.join("\n"));
-      event.clipboardData?.setData("text/html", html);
-      setTaskGridCopyActive(true);
-    }
-    document.addEventListener("copy", copyTaskGridSelection);
-    return () => document.removeEventListener("copy", copyTaskGridSelection);
-  }, [taskGridSelection, visibleItems, visibleTaskGridColumns]);
-
-  useEffect(() => {
-    function pasteTaskGridData(event: ClipboardEvent) {
-      if (!taskGridSelection) return;
-      const text = event.clipboardData?.getData("text/plain") ?? "";
-      if (!text.trim()) return;
-      const matrix = text.replace(/\r/g, "").split("\n").filter((line) => line.length > 0).map((line) => line.split("\t"));
-      const startRow = Math.min(taskGridSelection.anchorRow, taskGridSelection.focusRow);
-      const startColumn = Math.min(taskGridSelection.anchorColumn, taskGridSelection.focusColumn);
-      const targetColumns = visibleTaskGridColumns
-        .slice(startColumn)
-        .filter((column) => column.copyable && column.applyPasteValue);
-      if (!targetColumns.length) return;
-      let changed = 0;
-      const nextItems = items.map((item, rowIndex) => {
-        const sourceRow = rowIndex - startRow;
-        if (sourceRow < 0 || sourceRow >= matrix.length || item.type !== "task") return item;
-        const changes = matrix[sourceRow].reduce((result, value, sourceColumn) => {
-          const column = targetColumns[sourceColumn];
-          return column ? { ...result, ...column.applyPasteValue?.(value.trim(), { row: item }) } : result;
-        }, {} as Partial<ScheduleItem>);
-        if (!Object.keys(changes).length) return item;
-        changed += 1;
-        return { ...item, ...changes };
-      });
-      if (!changed) return;
-      event.preventDefault();
-      commitItems(nextItems, { description: `Dán ${changed} dòng dữ liệu từ Excel`, mergeKey: "paste-task-grid" });
-      onNotice(`Đã dán dữ liệu từ Excel vào ${changed} công tác`);
-    }
-    document.addEventListener("paste", pasteTaskGridData);
-    return () => document.removeEventListener("paste", pasteTaskGridData);
-  }, [commitItems, items, onNotice, taskGridSelection, visibleTaskGridColumns]);
-
-  function openTaskContextMenu(event: ReactMouseEvent<HTMLDivElement>, task: ScheduleItem) {
+  function openTaskContextMenu(event: ReactMouseEvent<HTMLDivElement>, task: TaskItem) {
     if (task.type !== "task") return;
     event.preventDefault();
     event.stopPropagation();
@@ -1017,7 +668,7 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     });
   }
 
-  function openTaskDetails(task: ScheduleItem) {
+  function openTaskDetails(task: TaskItem) {
     setSelectedItemId(task.id);
     setTaskDetailMode("docked");
     setTaskContextMenu(null);
@@ -1027,13 +678,13 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     });
   }
 
-  function getTaskToGroupHierarchyValidation(task: ScheduleItem) {
+  function getTaskToGroupHierarchyValidation(task: TaskItem) {
     const parent = itemById.get(task.parentId ?? "");
     if (parent?.type !== "workItem") return "Chỉ có thể chuyển Công tác trực tiếp dưới Hạng mục thành Nhóm.";
     return null;
   }
 
-  async function convertTaskToGroup(task: ScheduleItem) {
+  async function convertTaskToGroup(task: TaskItem) {
     const validationMessage = getTaskToGroupHierarchyValidation(task);
     setTaskContextMenu(null);
     if (validationMessage) {
@@ -1067,7 +718,7 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
         }));
         if (!converted) return current;
         return {
-          items: recalculateScheduleWbs(converted),
+          items: recalculateTaskWbs(converted),
           dependencies: current.dependencies.filter((dependency) => dependency.predecessorTaskId !== task.id && dependency.successorTaskId !== task.id),
         };
       },
@@ -1093,138 +744,6 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     };
   }, [taskContextMenu]);
 
-  function startWbsDrag(event: ReactPointerEvent<HTMLDivElement>, item: ScheduleItem) {
-    if (event.button !== 0 || item.type === "project") return;
-    event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const nextDrag = { sourceId: item.id, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, isActive: false };
-    wbsCaptureElementRef.current = event.currentTarget;
-    wbsDragRef.current = nextDrag;
-    wbsDropPreviewRef.current = null;
-    wbsSlotGeometriesRef.current = [];
-    setWbsDrag(nextDrag);
-    setSelectedItemId(item.id);
-  }
-
-  const refreshWbsSlotGeometries = useCallback((sourceId: string) => {
-    const pane = taskGridBodyScrollRef.current;
-    if (!pane) return [];
-    const rowElements = new Map<string, HTMLElement>();
-    pane.querySelectorAll<HTMLElement>("[data-wbs-row-id]").forEach((row) => {
-      if (row.dataset.wbsRowId) rowElements.set(row.dataset.wbsRowId, row);
-    });
-    const slots = buildTreeInsertionSlots(items, visibleItems.map((item) => item.id), sourceId);
-    const geometries = slots.flatMap<WbsSlotGeometry>((slot) => {
-      const row = rowElements.get(slot.lineItemId);
-      if (!row) return [];
-      const rowRect = row.getBoundingClientRect();
-      const nameCellRect = row.children.item(2)?.getBoundingClientRect();
-      return [{ ...slot, y: slot.lineEdge === "before" ? rowRect.top : rowRect.bottom, x: (nameCellRect?.left ?? rowRect.left) + 10 + slot.depth * 18 }];
-    });
-    wbsSlotGeometriesRef.current = geometries;
-    return geometries;
-  }, [items, visibleItems]);
-
-  useEffect(() => {
-    if (!wbsDrag) return;
-    function clearDrag() {
-      const currentDrag = wbsDragRef.current;
-      const captureElement = wbsCaptureElementRef.current;
-      if (currentDrag && captureElement?.hasPointerCapture(currentDrag.pointerId)) captureElement.releasePointerCapture(currentDrag.pointerId);
-      document.documentElement.classList.remove("wbs-reordering");
-      globalThis.getSelection()?.removeAllRanges();
-      wbsDragRef.current = null;
-      wbsDropPreviewRef.current = null;
-      wbsSlotGeometriesRef.current = [];
-      wbsCaptureElementRef.current = null;
-      if (wbsInsertionLineRef.current) wbsInsertionLineRef.current.style.display = "none";
-      setWbsDrag(null);
-    }
-    function renderInsertionLine(slot: WbsSlotGeometry | null) {
-      const line = wbsInsertionLineRef.current;
-      const paneRect = taskGridBodyScrollRef.current?.getBoundingClientRect();
-      if (!line || !slot || !paneRect) {
-        if (line) line.style.display = "none";
-        return;
-      }
-      line.style.display = "block";
-      line.style.left = `${paneRect.left}px`;
-      line.style.top = `${slot.y - 1}px`;
-      line.style.width = `${paneRect.width}px`;
-    }
-    function handlePointerMove(event: globalThis.PointerEvent) {
-      const currentDrag = wbsDragRef.current;
-      if (!currentDrag || event.pointerId !== currentDrag.pointerId) return;
-      const hasExceededThreshold = currentDrag.isActive || Math.hypot(event.clientX - currentDrag.startX, event.clientY - currentDrag.startY) >= 4;
-      if (!hasExceededThreshold) return;
-      event.preventDefault();
-      if (!currentDrag.isActive) {
-        const activeDrag = { ...currentDrag, isActive: true };
-        wbsDragRef.current = activeDrag;
-        setWbsDrag(activeDrag);
-        document.documentElement.classList.add("wbs-reordering");
-        refreshWbsSlotGeometries(currentDrag.sourceId);
-      }
-      const paneRect = taskGridBodyScrollRef.current?.getBoundingClientRect();
-      if (!paneRect || event.clientX < paneRect.left || event.clientX > paneRect.right || event.clientY < paneRect.top || event.clientY > paneRect.bottom) {
-        wbsDropPreviewRef.current = null;
-        renderInsertionLine(null);
-        return;
-      }
-      const geometries = wbsSlotGeometriesRef.current;
-      const closestY = Math.min(...geometries.map((slot) => Math.abs(slot.y - event.clientY)));
-      const verticalCandidates = geometries.filter((slot) => Math.abs(Math.abs(slot.y - event.clientY) - closestY) < .5);
-      const preview = closestY <= 22
-        ? verticalCandidates.reduce<WbsSlotGeometry | null>((closest, slot) => !closest || Math.abs(slot.x - event.clientX) < Math.abs(closest.x - event.clientX) ? slot : closest, null)
-        : null;
-      if (preview?.id === wbsDropPreviewRef.current?.id) return;
-      wbsDropPreviewRef.current = preview;
-      renderInsertionLine(preview);
-    }
-    function finishDrag(event: globalThis.PointerEvent) {
-      const currentDrag = wbsDragRef.current;
-      if (!currentDrag || event.pointerId !== currentDrag.pointerId) return;
-      const preview = wbsDropPreviewRef.current;
-      if (currentDrag.isActive && preview) {
-        const moved = moveTreeItemToSlot(items, currentDrag.sourceId, preview);
-        if (moved) {
-          const source = items.find((item) => item.id === currentDrag.sourceId);
-          commitItems(recalculateScheduleWbs(moved), { description: `Di chuyển ${source?.wbs ?? "dòng"} · ${source?.name ?? "WBS"}` });
-          setSelectedItemId(currentDrag.sourceId);
-          onNotice(`Đã di chuyển “${source?.name ?? "dòng WBS"}”`);
-        }
-      }
-      suppressWbsClickRef.current = currentDrag.isActive;
-      clearDrag();
-    }
-    function cancelDrag(event: globalThis.KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      clearDrag();
-    }
-    function refreshGeometry() {
-      const currentDrag = wbsDragRef.current;
-      if (currentDrag?.isActive) {
-        const geometries = refreshWbsSlotGeometries(currentDrag.sourceId);
-        const activeSlot = geometries.find((slot) => slot.id === wbsDropPreviewRef.current?.id) ?? null;
-        wbsDropPreviewRef.current = activeSlot;
-        renderInsertionLine(activeSlot);
-      }
-    }
-    document.addEventListener("pointermove", handlePointerMove, { passive: false });
-    document.addEventListener("pointerup", finishDrag);
-    document.addEventListener("pointercancel", clearDrag);
-    document.addEventListener("keydown", cancelDrag);
-    document.addEventListener("scroll", refreshGeometry, true);
-    return () => {
-      document.removeEventListener("pointermove", handlePointerMove);
-      document.removeEventListener("pointerup", finishDrag);
-      document.removeEventListener("pointercancel", clearDrag);
-      document.removeEventListener("keydown", cancelDrag);
-      document.removeEventListener("scroll", refreshGeometry, true);
-    };
-  }, [commitItems, items, onNotice, refreshWbsSlotGeometries, wbsDrag]);
-
   function createDependencyId() {
     return globalThis.crypto?.randomUUID?.() ?? `dependency-${Date.now()}`;
   }
@@ -1246,7 +765,7 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     return true;
   }
 
-  function openDependencyEditor(task: ScheduleItem, dependencyId?: string) {
+  function openDependencyEditor(task: TaskItem, dependencyId?: string) {
     if (task.type !== "task") {
       onNotice("Chỉ công tác thực hiện mới có quan hệ trước–sau");
       return;
@@ -1429,31 +948,7 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     });
   }
 
-  function startTaskNameColumnResize(event: ReactPointerEvent<HTMLButtonElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-    const startX = event.clientX;
-    const startWidth = taskNameColumnWidth;
-    const previousCursor = document.body.style.cursor;
-    const previousUserSelect = document.body.style.userSelect;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-    function handlePointerMove(pointerEvent: globalThis.PointerEvent) {
-      setTaskNameColumnWidth(Math.max(minimumTaskNameColumnWidth, Math.min(maximumTaskNameColumnWidth, startWidth + pointerEvent.clientX - startX)));
-    }
-    function finishResize() {
-      document.body.style.cursor = previousCursor;
-      document.body.style.userSelect = previousUserSelect;
-      document.removeEventListener("pointermove", handlePointerMove);
-      document.removeEventListener("pointerup", finishResize);
-      document.removeEventListener("pointercancel", finishResize);
-    }
-    document.addEventListener("pointermove", handlePointerMove);
-    document.addEventListener("pointerup", finishResize);
-    document.addEventListener("pointercancel", finishResize);
-  }
-
-  function updateSelected(changes: Partial<ScheduleItem>, description?: string, mergeKey?: string) {
+  function updateSelected(changes: Partial<TaskItem>, description?: string, mergeKey?: string) {
     if (!selectedItem) return;
     commitItems(
       (current) => current.map((item) => item.id === selectedItem.id ? { ...item, ...changes } : item),
@@ -1462,7 +957,7 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     onNotice(`Đã cập nhật nháp: ${selectedItem.name}`);
   }
 
-  function updateDuration(target: ScheduleItem, durationValue: number) {
+  function updateDuration(target: TaskItem, durationValue: number) {
     const duration = Math.max(1, Math.trunc(durationValue || 1));
     const finishDate = calculateFinishDate(target.startDate, duration) ?? target.finishDate;
     const ganttWidthPerDay = target.ganttWidth / Math.max(1, target.duration);
@@ -1474,7 +969,7 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     onNotice(`Đã cập nhật thời lượng và ngày kết thúc của ${target.name}`);
   }
 
-  function updateScheduleDate(target: ScheduleItem, field: "startDate" | "finishDate", value: string) {
+  function updateScheduleDate(target: TaskItem, field: "startDate" | "finishDate", value: string) {
     const oldDuration = Math.max(1, target.duration);
     const startDate = field === "startDate" ? value : target.startDate;
     let finishDate = field === "finishDate" ? value : target.finishDate;
@@ -1488,7 +983,7 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     }
     const ganttWidthPerDay = target.ganttWidth / Math.max(1, target.duration);
     const ganttWidth = Math.max(1, Math.min(100 - target.ganttLeft, ganttWidthPerDay * duration));
-    const changes: Partial<ScheduleItem> = { startDate, finishDate, duration, ganttWidth };
+    const changes: Partial<TaskItem> = { startDate, finishDate, duration, ganttWidth };
     scheduleHistory.commit((current) => {
       const changedItems = current.items.map((item) => item.id === target.id ? { ...item, ...changes } : item);
       const recalibratedDependencies = recalibrateIncomingDependencyLags(changedItems, current.dependencies, target.id, {
@@ -1501,7 +996,7 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     return true;
   }
 
-  function insertScheduleItem(context: ScheduleItem | undefined, position: "before" | "after") {
+  function insertScheduleItem(context: TaskItem | undefined, position: "before" | "after") {
     const projectId = context?.projectId ?? projects.find((project) => project.visible)?.id;
     if (!projectId) {
       onNotice("Hãy chọn ít nhất một dự án trước khi thêm công việc");
@@ -1511,14 +1006,14 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     if (!context || !projectRoot) return;
     const isProjectRoot = context.type === "project";
     const parentId = isProjectRoot ? context.id : context.parentId;
-    const itemType: ScheduleItemType = isProjectRoot ? "workItem" : context.type;
-    const defaultNames: Record<ScheduleItemType, string> = {
+    const itemType: TaskItemType = isProjectRoot ? "workItem" : context.type;
+    const defaultNames: Record<TaskItemType, string> = {
       project: "Dự án mới",
       workItem: "Hạng mục mới",
       group: "Nhóm công việc mới",
       task: "Công tác mới",
     };
-    const newItem: ScheduleItem = {
+    const newItem: TaskItem = {
       id: createEntityId(),
       projectId,
       parentId,
@@ -1532,22 +1027,9 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
       ganttLeft: 44,
       ganttWidth: 10,
     };
-    let insertIndex = items.indexOf(context);
-    if (isProjectRoot) {
-      if (position === "before") insertIndex += 1;
-      else {
-        insertIndex += 1;
-        while (insertIndex < items.length && items[insertIndex].projectId === context.projectId) insertIndex += 1;
-      }
-    } else if (position === "after") {
-      insertIndex += 1;
-      while (insertIndex < items.length && isScheduleDescendant(items[insertIndex], context.id, itemById)) insertIndex += 1;
-    }
-    const nextItems = recalculateScheduleWbs([
-      ...items.slice(0, insertIndex),
-      newItem,
-      ...items.slice(insertIndex),
-    ]);
+    const nextItems = context.type === "project"
+      ? insertTaskChild(items, context, newItem, position === "before" ? "first" : "last")
+      : insertTaskSibling(items, context, newItem, position);
     const insertedItem = nextItems.find((item) => item.id === newItem.id) ?? newItem;
     commitItems(nextItems, { description: `Chèn ${insertedItem.wbs} · ${insertedItem.name} ${position === "before" ? "phía trên" : "phía dưới"}` });
     setSelectedItemId(newItem.id);
@@ -1555,11 +1037,11 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     onNotice(`Đã chèn “${insertedItem.name}” ${position === "before" ? "phía trên" : "phía dưới"} dòng hiện tại`);
   }
 
-  function addChildItem(parent: ScheduleItem) {
+  function addChildItem(parent: TaskItem) {
     if (parent.type !== "project" && parent.type !== "workItem" && parent.type !== "group") return;
-    const itemType: ScheduleItemType = parent.type === "project" ? "workItem" : "task";
+    const itemType: TaskItemType = parent.type === "project" ? "workItem" : "task";
     const itemName = itemType === "workItem" ? "Hạng mục mới" : "Công tác mới";
-    const newItem: ScheduleItem = {
+    const newItem: TaskItem = {
       // ID is generated only when the user clicks an action button.
       id: createEntityId(),
       projectId: parent.projectId,
@@ -1574,13 +1056,7 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
       ganttLeft: 44,
       ganttWidth: 10,
     };
-    let insertIndex = items.indexOf(parent) + 1;
-    while (insertIndex < items.length && isScheduleDescendant(items[insertIndex], parent.id, itemById)) insertIndex += 1;
-    const nextItems = recalculateScheduleWbs([
-      ...items.slice(0, insertIndex),
-      newItem,
-      ...items.slice(insertIndex),
-    ]);
+    const nextItems = insertTaskChild(items, parent, newItem, "last");
     commitItems(nextItems, { description: `${itemType === "workItem" ? "Thêm hạng mục" : "Thêm công tác con"} · ${parent.name}` });
     setCollapsedIds((current) => {
       if (!current.has(parent.id)) return current;
@@ -1593,36 +1069,26 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     onNotice(`Đã thêm “${newItem.name}” vào “${parent.name}”`);
   }
 
-  async function deleteItem(targetItem?: ScheduleItem) {
+  async function deleteItem(targetItem?: TaskItem) {
     const target = targetItem ?? selectedItem;
     if (!target || target.type === "project") {
       onNotice("Không xóa dự án tại màn hình tiến độ");
       return;
     }
-    const idsToDelete = new Set([target.id]);
-    let changed = true;
-    while (changed) {
-      changed = false;
-      items.forEach((item) => {
-        if (item.parentId && idsToDelete.has(item.parentId) && !idsToDelete.has(item.id)) {
-          idsToDelete.add(item.id);
-          changed = true;
-        }
-      });
-    }
+    const preview = removeTaskSubtree(items, target.id);
     if (!await commonDialog.confirm({
       title: "Xóa dòng tiến độ",
       message: `Xóa “${target.name}” khỏi kế hoạch tiến độ?`,
-      detail: idsToDelete.size > 1 ? `Toàn bộ ${idsToDelete.size - 1} dòng con và các quan hệ công việc liên quan cũng sẽ bị xóa.` : "Các quan hệ công việc liên quan cũng sẽ bị xóa.",
+      detail: preview.removedIds.size > 1 ? `Toàn bộ ${preview.removedIds.size - 1} dòng con và các quan hệ công việc liên quan cũng sẽ bị xóa.` : "Các quan hệ công việc liên quan cũng sẽ bị xóa.",
       confirmText: "Xóa",
       tone: "danger",
     })) return;
     scheduleHistory.commit(
-      (current) => ({
-        items: current.items.filter((item) => !idsToDelete.has(item.id)),
-        dependencies: current.dependencies.filter((dependency) => !idsToDelete.has(dependency.predecessorTaskId) && !idsToDelete.has(dependency.successorTaskId)),
-      }),
-      { description: `Xóa ${target.wbs} · ${target.name}${idsToDelete.size > 1 ? ` và ${idsToDelete.size - 1} dòng con` : ""}` },
+      (current) => {
+        const result = removeTaskSubtree(current.items, target.id);
+        return { items: result.items, dependencies: current.dependencies.filter((dependency) => !result.removedIds.has(dependency.predecessorTaskId) && !result.removedIds.has(dependency.successorTaskId)) };
+      },
+      { description: `Xóa ${target.wbs} · ${target.name}${preview.removedIds.size > 1 ? ` và ${preview.removedIds.size - 1} dòng con` : ""}` },
     );
     setSelectedItemId(target.parentId ?? visibleItems[0]?.id ?? "");
     onNotice(`Đã xóa “${target.name}” khỏi dữ liệu nháp tiến độ`);
@@ -1642,7 +1108,7 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     return { left, width, y: rowIndex * scheduleRowHeight + scheduleRowHeight / 2 };
   }
 
-  function getGanttRowBar(item: ScheduleItem, rowIndex: number) {
+  function getGanttRowBar(item: TaskItem, rowIndex: number) {
     if (!timeline) return { left: 0, width: 0, hasBar: false, startDate: "", finishDate: "" };
     const derivedDates = item.type === "task" ? null : summaryDates.get(item.id);
     const startDate = derivedDates?.startDate ?? item.startDate;
@@ -1655,7 +1121,7 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     return { left, width, hasBar: true, startDate, finishDate, rowIndex };
   }
 
-  function startDependencyDrag(event: ReactPointerEvent<HTMLSpanElement>, task: ScheduleItem, barLeft: number, barWidth: number, rowIndex: number) {
+  function startDependencyDrag(event: ReactPointerEvent<HTMLSpanElement>, task: TaskItem, barLeft: number, barWidth: number, rowIndex: number) {
     event.preventDefault();
     event.stopPropagation();
     const sourcePoint = { x: barLeft + barWidth, y: rowIndex * scheduleRowHeight + scheduleRowHeight / 2 };
@@ -1664,7 +1130,7 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
     setDependencyDrag({ sourceTaskId: task.id, sourcePoint, pointerPosition: sourcePoint, initialPointerPosition: { x: event.clientX, y: event.clientY }, hasExceededThreshold: false });
   }
 
-  function isValidDependencyTarget(target: ScheduleItem) {
+  function isValidDependencyTarget(target: TaskItem) {
     if (!dependencyDrag || target.type !== "task") return false;
     const source = items.find((item) => item.id === dependencyDrag.sourceTaskId);
     if (!source) return false;
@@ -1697,9 +1163,9 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
 
     <ScheduleBoard
       style={scheduleBoardStyle}
-      taskGrid={<TaskGridPresentation
+      taskGrid={<TaskGrid
       visibleItems={visibleItems}
-      rowContext={{ selectedItem, hasChildren, summaryDates, getProjectScheduleStatus, projectStatusById, incomingDependencies, formatDependencyLabel, scheduleOrder, itemById, wbsDrag, suppressWbsClickRef, setSelectedItemId, openTaskContextMenu, startWbsDrag, addChildItem, insertScheduleItem, deleteItem, autoEditItemId, setAutoEditItemId, getScheduleTreeDepth, collapsedIds, toggleCollapse, InlineNameEditor, commitItems, onNotice, columnGroupVisibility, updateDuration, InlineDateEditor, updateScheduleDate, openDependencyEditor, ScheduleStatusChip, formatOptionalNumber }}      emptyContent={<div className="schedule-empty">Chưa chọn dự án nào trong “Danh sách dự án”.</div>}
+      rowContext={{ base: { selectedItem, itemById, taskOrder: scheduleOrder, hasChildren, wbsDrag, suppressWbsClickRef, setSelectedItemId, openTaskContextMenu, startWbsDrag, addChildItem, insertScheduleItem, deleteItem, autoEditItemId, setAutoEditItemId, getScheduleTreeDepth: getTaskTreeDepth, collapsedIds, toggleCollapse, InlineNameEditor, commitItems, onNotice, columnGroupVisibility, formatOptionalNumber }, schedule: { summaryDates, getProjectScheduleStatus, projectStatusById, incomingDependencies, formatDependencyLabel, updateDuration, InlineDateEditor, updateScheduleDate, openDependencyEditor, ScheduleStatusChip } }}      emptyContent={<div className="schedule-empty">Chưa chọn dự án nào trong “Danh sách dự án”.</div>}
         visibleColumns={visibleTaskGridColumns}
         columnGroups={taskGridColumnGroups}
         columnGroupVisibility={columnGroupVisibility}
@@ -1776,6 +1242,6 @@ export function TaskGrid({ projects, onNotice, taskState, className }: ScheduleV
 }
 
 export function ScheduleView(props: Omit<ScheduleViewProps, "className">) {
-  return <TaskGrid {...props} />;
+  return <ScheduleWorkspace {...props} />;
 }
 

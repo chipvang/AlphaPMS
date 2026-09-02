@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import type { TaskGridColumnGroupVisibility } from "./taskGridTypes";
 
-export type TaskGridSelection = { anchorRow: number; anchorColumn: number; focusRow: number; focusColumn: number };
+export type TaskGridSelection = { anchorRowId: string; anchorColumnId: string; focusRowId: string; focusColumnId: string };
 
 /** Grid-local UI state only. Domain, schedule and Gantt state remain with their owners. */
 export function useTaskGridController() {
