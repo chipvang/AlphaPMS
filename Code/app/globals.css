@@ -198,10 +198,14 @@ button {
 
 .menu-symbol {
   width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
   text-align: center;
-  font-size: 16px;
   flex: 0 0 auto
 }
+
+.sidebar-icon { width: 24px; height: 24px; display: block; }
 
 .sidebar-footer {
   margin-top: auto;
@@ -2933,6 +2937,152 @@ button {
 
 .confirm-actions .button {
   min-width: 94px
+}
+
+/* Structural split: ScheduleBoard coordinates independent TaskGrid/Gantt viewports. */
+.schedule-board-layout {
+  display: grid;
+  grid-template-columns: min(var(--schedule-table-width, 928px), calc(100% - 328px)) 8px minmax(320px, 1fr);
+  min-height: 0;
+  flex: 1 1 0;
+  overflow: hidden
+}
+
+.schedule-board-task-grid,
+.schedule-board-gantt {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable
+}
+
+.schedule-board-task-grid { grid-column: 1; }
+.schedule-board-gantt { grid-column: 3; }
+
+.vertical-block-splitter {
+  grid-column: 2;
+  min-height: 100%;
+  border-inline: 1px solid var(--line);
+  background: var(--surface-soft)
+}
+
+.task-grid-block,
+.gantt-timeline-block {
+  display: grid;
+  grid-template-rows: 30px 74px minmax(0, 1fr) 17px;
+  min-height: 100%
+}
+
+.task-grid-block .task-grid-column-selector { grid-row: 1; }
+.task-grid-block .schedule-board-header { grid-row: 2; }
+.task-grid-block .schedule-table-pane { grid-row: 3; }
+.task-grid-block .task-grid-scrollbar-dock { grid-row: 4; }
+.gantt-timeline-block::before { content: ""; grid-row: 1; background: var(--surface-soft); border: 1px solid var(--line); border-bottom: 0; }
+.gantt-timeline-block .gantt-header-pane { grid-row: 2; }
+.gantt-timeline-block .gantt-pane { grid-row: 3; min-height: 0; }
+.gantt-timeline-block .gantt-scrollbar-dock { grid-row: 4; }
+
+.task-grid-block .schedule-board-header { display: block; padding-right: 0; }
+.task-grid-block .schedule-table-pane { overflow-y: hidden; }
+.gantt-timeline-block .gantt-pane { overflow-y: hidden; }
+
+/* Dự toán V1: ba pane độc lập, dùng cùng mật độ/typography với TaskGrid. */
+.estimate-screen {
+  min-height: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg)
+}
+
+.estimate-toolbar {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface)
+}
+
+.estimate-toolbar > div { display: flex; align-items: center; gap: 6px; }
+
+.estimate-workspace {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(550px, 40%) minmax(0, 1fr);
+  gap: 8px;
+  flex: 1;
+  padding: 8px;
+  overflow: hidden
+}
+
+.estimate-right-panes { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+
+.estimate-pane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface)
+}
+
+.estimate-pane-header { flex: 0 0 auto; padding: 10px 12px 8px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.estimate-pane-header h2 { margin: 0; color: var(--text); font-size: 12px; font-weight: 600; }
+.estimate-pane-header p, .estimate-resource-caption { margin: 7px 0 0; color: var(--muted); font-size: var(--ui-min-font-size); }
+
+.estimate-search { height: 36px; display: flex; align-items: center; gap: 7px; margin-top: 10px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 5px; }
+.estimate-search span { color: var(--muted); font-size: 16px; }
+.estimate-search input { width: 100%; border: 0; outline: 0; background: transparent; font-size: 12px; }
+
+.estimate-shared-task-grid { border: 0; border-radius: 0; background: transparent; }
+.estimate-shared-task-grid .schedule-screen { min-height: 0; }
+.estimate-task-grid .schedule-toolbar,
+.estimate-task-grid .schedule-legend,
+.estimate-task-grid .schedule-detail,
+.estimate-task-grid .schedule-detail-collapsed,
+.estimate-task-grid .gantt-pane,
+.estimate-task-grid .gantt-scrollbar-row > :last-child { display: none; }
+.estimate-task-grid .schedule-board-header,
+.estimate-task-grid .schedule-board-body,
+.estimate-task-grid .schedule-board-scroll,
+.estimate-task-grid .gantt-scrollbar-row { grid-template-columns: minmax(0, 1fr); }
+.estimate-task-grid .schedule-board-scroll,
+.estimate-task-grid .task-grid-scrollbar-dock { grid-column: 1; }
+
+.estimate-table-wrap { min-height: 0; flex: 1; overflow: auto; }
+.estimate-data-grid { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 11px; }
+.estimate-data-grid th { position: sticky; top: 0; z-index: 1; min-height: 36px; padding: 5px 7px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface-soft); color: #111820; font-size: var(--table-header-font-size); font-weight: 600; text-align: center; white-space: nowrap; }
+.estimate-data-grid td { height: 32px; padding: 4px 7px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); color: #111820; white-space: nowrap; }
+.estimate-data-grid td:nth-child(1), .estimate-data-grid td:nth-child(2) { text-align: center; }
+.estimate-data-grid td:nth-child(n+8) { text-align: right; font-variant-numeric: tabular-nums; }
+.estimate-data-grid tbody tr { cursor: pointer; }
+.estimate-data-grid tbody tr:hover, .estimate-data-grid tbody tr.selected { background: var(--primary-soft); }
+.estimate-item-pane .estimate-data-grid th:nth-child(5), .estimate-item-pane .estimate-data-grid td:nth-child(5) { min-width: 190px; white-space: normal; }
+.estimate-resource-pane .estimate-data-grid th:nth-child(4), .estimate-resource-pane .estimate-data-grid td:nth-child(4) { min-width: 170px; }
+.estimate-actions { color: var(--muted); letter-spacing: 1px; }
+.estimate-data-grid .estimate-actions { padding: 0 4px; }
+.estimate-row-actions { min-width: 74px; margin: 0 auto; }
+.estimate-cell-value { width: 100%; border: 0; padding: 0; background: transparent; color: inherit; font: inherit; font-size: var(--ui-min-font-size); text-align: inherit; white-space: inherit; cursor: text; }
+.estimate-data-grid td.estimate-numeric .estimate-cell-value { text-align: right; font-variant-numeric: tabular-nums; }
+.estimate-inline-input { box-sizing: border-box; width: 100%; min-width: 52px; height: 24px; border: 1px solid var(--primary); border-radius: 3px; padding: 2px 4px; background: var(--surface); color: inherit; font: inherit; font-size: var(--ui-min-font-size); text-align: inherit; }
+.estimate-empty { height: 72px; color: var(--muted) !important; text-align: center !important; }
+
+.estimate-resource-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.estimate-tabs, .estimate-modes { display: flex; align-items: center; gap: 2px; }
+.estimate-tabs { margin-top: 9px; }
+.estimate-tabs button, .estimate-modes button { min-height: 27px; padding: 0 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--muted); font-size: var(--ui-min-font-size); white-space: nowrap; }
+.estimate-tabs button.active, .estimate-modes button.active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary-dark); }
+.estimate-resource-caption { flex: 0 0 auto; margin: 0; padding: 7px 12px; border-bottom: 1px solid var(--line); }
+
+@media (max-width: 1200px) {
+  .estimate-workspace { grid-template-columns: minmax(470px, 42%) minmax(0, 1fr); }
+  .estimate-resource-header { flex-direction: column; }
 }
 
 .insert-menu {
